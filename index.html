@@ -37,6 +37,26 @@ a{color:var(--pri)}
 /* ---------- LOGIN ---------- */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#052e2b 0%,#0f766e 55%,#0ea5e9 100%);padding:20px}
 .login-box{background:#fff;border-radius:18px;padding:30px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-split{display:flex;gap:24px;align-items:stretch;max-width:1000px;width:100%;flex-wrap:wrap;justify-content:center}
+.login-box{flex:0 1 420px;max-width:420px}
+.login-panel{flex:1 1 480px;max-width:560px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:22px;color:#ecfeff;backdrop-filter:blur(4px);min-width:320px}
+.login-panel h2{font-size:18px;color:#fff;margin-bottom:10px}
+.ps-stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+.ps-stat-card{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:12px;text-align:center}
+.ps-stat-num{font-size:26px;font-weight:700;color:#fff}
+.ps-stat-label{font-size:12px;color:#ccfbf1}
+.ps-search{width:100%;padding:10px 12px;border-radius:10px;border:none;margin-bottom:10px;font-size:14px}
+.ps-list{max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.ps-item{display:flex;justify-content:space-between;align-items:center;gap:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:8px 12px;font-size:14px;cursor:pointer;transition:.15s}
+.ps-item:hover{background:rgba(255,255,255,.16)}
+.ps-item.selected{background:rgba(20,184,166,.4);border-color:#5eead4}
+.ps-item-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ps-item-form{font-size:11px;background:rgba(20,184,166,.25);padding:2px 8px;border-radius:10px;white-space:nowrap}
+.ps-item small{display:block;color:#a7f3d0;font-size:11px}
+.ps-count{margin-top:10px;font-size:12px;color:#a7f3d0;text-align:center}
+.ps-reset{text-align:right;margin-bottom:6px}
+.ps-reset button{background:none;border:none;color:#a7f3d0;font-size:12px;cursor:pointer;text-decoration:underline}
+@media (max-width:900px){.login-split{flex-direction:column}.login-panel{max-width:100%}}
 .brand{display:flex;gap:12px;align-items:center;margin-bottom:20px}
 .brand-ic{font-size:40px}
 .brand h1{font-size:22px;color:#064e3b}

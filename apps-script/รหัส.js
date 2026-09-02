@@ -59,6 +59,8 @@ function doPost(e) {
       res = getSchoolList();
     } else if (action === 'getSchoolListPublic') {
       res = getSchoolList();
+    } else if (action === 'getStatsPublic') {
+      res = getStatsSchool();
     } else if (action === 'getStatsSchool') {
       res = getStatsSchool();
     } else if (action === 'getSchoolData') {

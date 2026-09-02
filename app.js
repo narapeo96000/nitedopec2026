@@ -271,39 +271,94 @@ function showLogin() {
   const app = $('#app');
   app.innerHTML = `
   <div class="login-wrap">
-    <div class="login-box">
-      <div class="brand"><div class="brand-ic">🏫</div><div><h1>ระบบนิเทศออนไลน์</h1><p>สถานศึกษาเอกชนในระบบ จังหวัดนราธิวาส</p></div></div>
-      <form id="loginForm" onsubmit="return doLogin(event)">
-        <label>Username <input type="text" id="username" autocomplete="username" required></label>
-        <label>Password
-          <div class="pw-row"><input type="password" id="password" autocomplete="current-password" required>
-          <button type="button" class="pw-eye" onclick="togglePw()" id="pwEye">👁</button></div>
-        </label>
-        <label class="login-sel-school">🏫 เลือกโรงเรียนที่จะเข้านิเทศ
-          <select id="loginSchoolSel"><option value="">— ไม่เลือก (ไปหน้า Dashboard) —</option></select>
-        </label>
-        <div class="opt-row">
-          <label class="chk"><input type="checkbox" id="showPass" onchange="togglePw()"> แสดงรหัสผ่าน</label>
-          <label class="chk"><input type="checkbox" id="rememberPass"> จดจำการเข้าสู่ระบบ</label>
+    <div class="login-split">
+      <div class="login-box">
+        <div class="brand"><div class="brand-ic">🏫</div><div><h1>ระบบนิเทศออนไลน์</h1><p>สถานศึกษาเอกชนในระบบ จังหวัดนราธิวาส</p></div></div>
+        <form id="loginForm" onsubmit="return doLogin(event)">
+          <div id="loginMsg" class="login-msg"></div>
+          <label>Username <input type="text" id="username" autocomplete="username" required></label>
+          <label>Password
+            <div class="pw-row"><input type="password" id="password" autocomplete="current-password" required>
+            <button type="button" class="pw-eye" onclick="togglePw()" id="pwEye">👁</button></div>
+          </label>
+          <div class="opt-row">
+            <label class="chk"><input type="checkbox" id="showPass" onchange="togglePw()"> แสดงรหัสผ่าน</label>
+            <label class="chk"><input type="checkbox" id="rememberPass"> จดจำการเข้าสู่ระบบ</label>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">เข้าสู่ระบบ</button>
+        </form>
+        <div class="login-alt">ยังไม่มีบัญชี? <a href="#" onclick="showRegister();return false;">สมัครสมาชิก</a></div>
+      </div>
+      <div class="login-panel">
+        <h2>📊 สถิติสถานศึกษาเอกชน จ.นราธิวาส</h2>
+        <div class="ps-stat">
+          <div class="ps-stat-card"><div class="ps-stat-num" id="psSchools">-</div><div class="ps-stat-label">สถานศึกษา</div></div>
+          <div class="ps-stat-card"><div class="ps-stat-num" id="psEval">-</div><div class="ps-stat-label">ครั้งที่นิเทศ</div></div>
+          <div class="ps-stat-card"><div class="ps-stat-num" id="psStaff">-</div><div class="ps-stat-label">ครู/บุคลากร</div></div>
+          <div class="ps-stat-card"><div class="ps-stat-num" id="psStudents">-</div><div class="ps-stat-label">นักเรียน</div></div>
         </div>
-        <div id="loginMsg" class="login-msg"></div>
-        <button type="submit" class="btn btn-primary btn-block">เข้าสู่ระบบ</button>
-      </form>
-      <div class="login-alt">ยังไม่มีบัญชี? <a href="#" onclick="showRegister();return false;">สมัครสมาชิก</a></div>
+        <div class="ps-reset"><button type="button" onclick="loginSchoolClear()">↩ ล้างการเลือก</button></div>
+        <input type="text" id="psSearch" class="ps-search" placeholder="🔍 พิมพ์ค้นหาโรงเรียน..." oninput="loginSchoolFilter(this.value)">
+        <div class="ps-list" id="psList"><div class="loading" style="color:#ccfbf1">กำลังโหลดรายชื่อ...</div></div>
+        <div class="ps-count" id="psCount"></div>
+      </div>
     </div>
   </div>`;
   restoreSavedLogin();
-  loadLoginSchools();
+  loadLoginData();
 }
 
-async function loadLoginSchools() {
+let LOGIN_SCHOOLS = [];
+function loginSchoolClear() {
+  $('#psSearch').value = '';
+  loginSchoolFilter('');
+}
+function loginSchoolFilter(q) {
+  const kw = (q || '').toLowerCase().trim();
+  const list = LOGIN_SCHOOLS.filter(s =>
+    !kw || (s.name || '').toLowerCase().includes(kw) ||
+    (s.dist || '').toLowerCase().includes(kw) ||
+    (s.subdist || '').toLowerCase().includes(kw) ||
+    (s.form || '').toLowerCase().includes(kw));
+  renderLoginSchools(list);
+}
+function renderLoginSchools(list) {
+  const box = $('#psList');
+  if (!box) return;
+  if (!list.length) { box.innerHTML = `<div class="empty" style="background:transparent;border-color:rgba(255,255,255,.2);color:#a7f3d0">ไม่พบสถานศึกษา</div>`; $('#psCount').textContent = ''; return; }
+  box.innerHTML = list.map(s => `
+    <div class="ps-item ${s.id === LOGIN_SCHOOL_ID ? 'selected' : ''}" onclick="loginPickSchool('${esc(s.id)}')">
+      <div class="ps-item-name"><b>${esc(s.name)}</b><small>${esc(s.dist || '')} ${esc(s.subdist || '')}</small></div>
+      <span class="ps-item-form">${esc(s.form || '')}</span>
+    </div>`).join('');
+  $('#psCount').textContent = 'พบ ' + list.length + ' จาก ' + LOGIN_SCHOOLS.length + ' แห่ง';
+}
+function loginPickSchool(id) {
+  LOGIN_SCHOOL_ID = id;
+  const s = LOGIN_SCHOOLS.find(x => x.id === id);
+  renderLoginSchoolsFilterKeep();
+  toast(s ? ('เลือก: ' + s.name) : 'เลือก: ' + id, true);
+}
+function renderLoginSchoolsFilterKeep() {
+  loginSchoolFilter($('#psSearch').value);
+}
+async function loadLoginData() {
+  // สถิติ
+  const st = await post('getStatsPublic');
+  if (st && st.success && st.data) {
+    const d = st.data;
+    const set = (id, v) => { const e = $('#' + id); if (e) e.textContent = v; };
+    set('psSchools', d.totalSchools); set('psEval', d.totalEval);
+    set('psStaff', d.staff); set('psStudents', d.students);
+  }
+  // รายชื่อโรงเรียน
   const r = await post('getSchoolListPublic');
   if (r && r.success && r.data) {
-    const sel = $('#loginSchoolSel');
-    if (!sel) return;
-    const schools = r.data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    sel.innerHTML = '<option value="">— ไม่เลือก (ไปหน้า Dashboard) —</option>' +
-      schools.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+    LOGIN_SCHOOLS = r.data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    renderLoginSchools(LOGIN_SCHOOLS);
+  } else {
+    const box = $('#psList');
+    if (box) box.innerHTML = `<div class="empty" style="background:transparent;border-color:rgba(255,255,255,.2);color:#a7f3d0">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อได้')}</div>`;
   }
 }
 
@@ -347,8 +402,6 @@ async function doLogin(e) {
   e.preventDefault();
   const u = $('#username').value.trim();
   const p = $('#password').value;
-  const sel = $('#loginSchoolSel');
-  LOGIN_SCHOOL_ID = sel ? sel.value : '';
   const msg = $('#loginMsg');
   msg.className = 'login-msg err';
   msg.textContent = 'กำลังตรวจสอบข้อมูล...';
