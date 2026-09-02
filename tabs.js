@@ -403,6 +403,7 @@ async function saveResult(editRow) {
   const res = await post('saveSchoolEvaluation', { ...payload, supervisor: CURRENT_USER ? (CURRENT_USER.fname + ' (' + CURRENT_USER.username + ')') : '', editRow: editRow || null });
   if (res && res.success) {
     toast(res.message || 'บันทึกเรียบร้อยแล้ว', true);
+    clearDraft();
     if (SELECTED) SELECTED = { ...SELECTED, ...payload.schoolData };
     showEvalHistory();
   } else {
@@ -477,18 +478,22 @@ async function refreshFiles() {
 
 async function doUpload() {
   const input = $('#filePick');
-  const f = input && input.files && input.files[0];
-  if (!f) { toast('เลือกไฟล์ก่อน', false); return; }
-  if (f.size > 8 * 1024 * 1024) { toast('ไฟล์ใหญ่เกิน 8MB กรุณาเลือกไฟล์อื่น', false); return; }
-  toast('กำลังอัปโหลด " ' + f.name + ' "...', false);
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const data64 = String(reader.result).split(',')[1];
-    const r = await post('uploadFile', { schoolId: SELECTED.id, filename: f.name, mime: f.type || 'application/octet-stream', data64 });
-    if (r && r.success) { toast(r.message, true); input.value = ''; refreshFiles(); }
-    else toast((r || {}).message || 'อัปโหลดไม่สำเร็จ', false);
-  };
-  reader.readAsDataURL(f);
+  const files = input && input.files;
+  if (!files || !files.length) { toast('เลือกไฟล์ก่อน', false); return; }
+  for (const f of files) {
+    if (f.size > 8 * 1024 * 1024) { toast('ไฟล์ "' + f.name + '" ใหญ่เกิน 8MB', false); continue; }
+    toast('กำลังอัปโหลด "' + f.name + '" ...', false);
+    const compressed = await compressImage(f);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const data64 = String(reader.result).split(',')[1];
+      const r = await post('uploadFile', { schoolId: SELECTED.id, filename: compressed.name, mime: compressed.type || 'application/octet-stream', data64 });
+      if (r && r.success) { toast(r.message, true); refreshFiles(); }
+      else toast((r || {}).message || 'อัปโหลดไม่สำเร็จ', false);
+    };
+    reader.readAsDataURL(compressed);
+  }
+  input.value = '';
 }
 
 async function deleteUpload(id) {

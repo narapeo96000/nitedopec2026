@@ -106,6 +106,7 @@ function esc(s) {
 }
 function toast(msg, ok) {
   const t = $("#toast");
+  if (!t) return;
   t.textContent = msg.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "");
   t.className = "toast show " + (ok ? "ok" : "err");
   clearTimeout(t._tm);
@@ -123,17 +124,47 @@ function getColor(pct) {
   if (pct >= 40) return "#d97706";
   return "#dc2626";
 }
-async function post(action, payload) {
-  try {
-    const r = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action, payload })
-    });
-    return await r.json();
-  } catch (e) {
-    return { success: false, message: "เชื่อมต่อระบบล้มเหลว โปรดตรวจอินเทอร์เน็ตแล้วลองใหม่ (" + e.message + ")" };
+
+// --- Network retry (3 ครั้ง + exponential backoff) ---
+async function post(action, payload, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const r = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action, payload })
+      });
+      return await r.json();
+    } catch (e) {
+      if (i === retries - 1) {
+        return { success: false, message: "เชื่อมต่อระบบล้มเหลว โปรดตรวจอินเทอร์เน็ตแล้วลองใหม่ (" + e.message + ")" };
+      }
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+    }
   }
+}
+
+// --- Image compression (canvas resize + quality 0.7) ---
+function compressImage(file, maxW = 1600, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/') || file.size < 500 * 1024) { resolve(file); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      c.toBlob(b => {
+        if (b && b.size < file.size) resolve(new File([b], file.name, { type: 'image/jpeg' }));
+        else resolve(file);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
 }
 
 // -------------------------------------------------------------
@@ -148,6 +179,60 @@ let MAP_MARKER = null;
 let TABS = [];              // พาเนลแท็บที่ build ไว้
 let scrollItems = [];
 let sidebarTouched = false;
+let AUTO_SAVE_KEY = 'opec_autosave';
+let AUTO_SAVE_INTERVAL = null;
+let LAST_SAVE_HASH = '';
+
+// --- Auto-save to localStorage ---
+function saveDraft() {
+  if (!SELECTED || !CURRENT_USER) return;
+  const hash = JSON.stringify(STATE).length + '' + Object.keys(STATE.answers).length;
+  if (hash === LAST_SAVE_HASH) return;
+  LAST_SAVE_HASH = hash;
+  const draft = {
+    schoolId: SELECTED.id,
+    username: CURRENT_USER.username,
+    timestamp: new Date().toISOString(),
+    state: STATE
+  };
+  try { localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(draft)); } catch(e) {}
+}
+function loadDraft(schoolId) {
+  try {
+    const raw = localStorage.getItem(AUTO_SAVE_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (d.schoolId === schoolId) return d;
+  } catch(e) {}
+  return null;
+}
+function clearDraft() {
+  try { localStorage.removeItem(AUTO_SAVE_KEY); } catch(e) {}
+}
+function startAutoSave() {
+  if (AUTO_SAVE_INTERVAL) clearInterval(AUTO_SAVE_INTERVAL);
+  AUTO_SAVE_INTERVAL = setInterval(saveDraft, 30000);
+}
+function restoreDraftIfAny() {
+  if (!SELECTED) return;
+  const draft = loadDraft(SELECTED.id);
+  if (!draft || !draft.state) return;
+  if (!confirm('พบข้อมูลร่างล่าสุดจาก ' + new Date(draft.timestamp).toLocaleString('th') + '\nต้องการกู้คืนข้อมูลหรือไม่?')) { clearDraft(); return; }
+  STATE = draft.state;
+  document.querySelectorAll('button.sc[data-key]').forEach(btn => {
+    const key = btn.dataset.key;
+    if (STATE.answers[key] !== undefined) {
+      const v = STATE.answers[key];
+      if (v === null) { btn.classList.add('scsel'); }
+      else if (Number(btn.dataset.sc) === v) { btn.classList.add('scsel'); }
+    }
+  });
+  document.querySelectorAll('textarea.note[data-key]').forEach(ta => {
+    const key = ta.dataset.key;
+    if (STATE.notes[key]) ta.value = STATE.notes[key];
+  });
+  toast('กู้คืนข้อมูลร่างเรียบร้อย', true);
+}
 
 const SC0 = { label: '0', hint: 'ต้องได้รับการช่วยเหลือ', cls: 'sc0' };
 const SC1 = { label: '1', hint: 'กำลังพัฒนา', cls: 'sc1' };
@@ -263,7 +348,9 @@ async function doRegister(e) {
 function logout() {
   CURRENT_USER = null;
   SCHOOLS = []; SELECTED = null; STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {} };
+  if (AUTO_SAVE_INTERVAL) clearInterval(AUTO_SAVE_INTERVAL);
   localStorage.removeItem(REMEMBER_KEY);
+  clearDraft();
   showLogin();
 }
 
@@ -274,19 +361,24 @@ async function startDash() {
   const app = $('#app');
   app.innerHTML = `
   <div class="topbar">
-    <div class="tb-brand">🏫 <b>${APP_NAME}</b></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="hamburger" onclick="toggleSidebar()" id="hamburgerBtn">☰</button>
+      <div class="tb-brand">🏫 <b>${APP_NAME}</b></div>
+    </div>
     <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small>
       <button class="btn btn-mini" onclick="logout()">ออกจากระบบ</button>
     </div>
   </div>
   <div class="main">
-    <aside class="side">
+    <aside class="side" id="sidebar">
+      <div class="side-close"><button onclick="toggleSidebar()">✕ ปิด</button></div>
       <div class="side-card">
         <h4>เลือกสถานศึกษา</h4>
         <select id="schoolSelect" onchange="loadSchool(this.value)"><option value="">— เลือกสถานศึกษา —</option></select>
         <div id="pinCard"></div>
         <div class="side-actions">
           <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
       </div>
       <div class="nav">
@@ -348,6 +440,8 @@ async function loadSchool(id) {
   STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {} };
   buildAll();
   switchTab('tab-1');
+  startAutoSave();
+  restoreDraftIfAny();
   toast('เลือก ' + SELECTED.name + ' แล้ว', true);
 }
 
@@ -384,14 +478,18 @@ function initPinBar() {
     }
   }
   $('#gpsBtn').onclick = async () => {
-    if (!navigator.geolocation) { toast('อุปกรณ์ไม่รองรับ GPS', false); return; }
+    if (!navigator.geolocation) { toast('อุปกรณ์ไม่รองรับ GPS', false); return;
+      toast('กำลังค้นหาพิกัด... (อาจใช้เวลา 15-30 วินาที)', false);
+    }
     navigator.geolocation.getCurrentPosition(p => {
       const lat = p.coords.latitude.toFixed(6), lng = p.coords.longitude.toFixed(6);
       $('#coords').value = lat + ', ' + lng;
       if (MAP_MARKER) MAP_MARKER.setLatLng([lat, lng]); else MAP_MARKER = L.marker([lat, lng]).addTo(MAP);
       MAP.setView([lat, lng], 15);
-      toast('ได้พิกัดจาก GPS แล้ว', true);
-    }, () => toast('ไม่สามารถระบุพิกัดได้', false), { enableHighAccuracy: true, timeout: 8000 });
+      toast('ได้พิกัดจาก GPS แล้ว (' + lat + ', ' + lng + ')', true);
+    }, (err) => {
+      toast('GPS ไม่สำเร็จ: ' + (err.code === 2 ? 'ไม่พบสัญญาณ GPS' : err.code === 3 ? 'หมดเวลาค้นหา' : 'กรุณาพิมพ์พิกัดเอง') + ' — ลองคลิกบนแผนที่', false);
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 });
   };
   MAP.on('click', e => {
     const lat = e.latlng.lat.toFixed(6), lng = e.latlng.lng.toFixed(6);
@@ -414,3 +512,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   showLogin();
 });
+
+// --- Sidebar toggle สำหรับมือถือ ---
+function toggleSidebar() {
+  const sb = $('#sidebar');
+  if (sb) sb.classList.toggle('open');
+}
+
+// --- Print / PDF export ---
+function printReport() {
+  window.print();
+}

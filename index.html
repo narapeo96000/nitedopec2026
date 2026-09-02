@@ -174,6 +174,51 @@ textarea.note{width:100%;resize:vertical}
   .content{padding:12px}
   .hide-m{display:none}
 }
+/* --- Hamburger menu สำหรับมือถือ --- */
+.hamburger{display:none;background:none;border:none;font-size:28px;color:#ecfeff;cursor:pointer;padding:4px 8px}
+@media (max-width:760px){
+  .hamburger{display:block}
+  .side{display:none;position:fixed;top:52px;left:0;right:0;bottom:0;z-index:100;overflow-y:auto;border-radius:0;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+  .side.open{display:block}
+  .side-close{display:flex;justify-content:flex-end;padding:8px 12px}
+  .side-close button{background:#fee2e2;color:#991b1b;border:none;border-radius:8px;padding:6px 14px;font-weight:600;cursor:pointer}
+}
+/* --- Print / PDF export --- */
+@media print{
+  .topbar,.side,#toast,.hamburger,.side-close{display:none!important}
+  .main{display:block!important}
+  .content{padding:0!important}
+  .panel{display:block!important}
+  .panel-head h2{font-size:16px}
+  .chip{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .sc.scsel{print-color-adjust:exact;-webkit-print-color-adjust:exact;border:2px solid #0f766e;background:#ccfbf1}
+  .grp-h{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .hist-card,.form-wrap{border:1px solid #ccc;page-break-inside:avoid}
+  .btn,.toolbar{display:none!important}
+}
+/* --- Dark mode สำหรับกลางแจ้ง --- */
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0f172a;--card:#1e293b;--ink:#e2e8f0;--mut:#94a3b8;--pri:#14b8a6;--pri2:#2dd4bf;--bord:#334155}
+  body{background:#0f172a;color:#e2e8f0}
+  input,select,textarea{background:#1e293b;color:#e2e8f0;border-color:#475569}
+  .topbar{background:#020617}
+  .side{background:#1e293b;border-color:#334155}
+  .tb-nav{color:#e2e8f0}
+  .tb-nav:hover{background:#334155}
+  .card,.form-wrap,.hist-card,.stat-card,.help-card{background:#1e293b;border-color:#334155;color:#e2e8f0}
+  .grp-h{background:#0f172a;color:#5eead4}
+  .it{border-color:#334155}
+  .i-head{background:#1e293b}
+  .sc{background:#1e293b;border-color:#475569;color:#e2e8f0}
+  .sc.scsel{background:#134e4a;border-color:#14b8a6;color:#5eead4}
+  .empty{background:#1e293b;border-color:#475569;color:#94a3b8}
+  .login-wrap{background:linear-gradient(135deg,#020617 0%,#134e4a 55%,#0c4a6e 100%)}
+  .login-box{background:#1e293b}
+  .meta-box{background:#0f172a;border-color:#134e4a}
+  .agree-tb th{background:#134e4a;color:#5eead4}
+  .tb th{background:#134e4a;color:#5eead4}
+  .score-bar,.stat-card b{color:#5eead4}
+}
 </style>
 </head>
 <body>
