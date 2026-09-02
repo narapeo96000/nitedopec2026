@@ -311,7 +311,7 @@ function buildTab7() {
 // จัดการการแสดง panel + switchTab
 // ============================================================
 function switchTab(id) {
-  ['tab-1','tab-2','tab-3','tab-4','tab-5','tab-6','tab-7','tab-hist','tab-stats','tab-users','tab-info'].forEach(t =>
+  ['tab-1','tab-2','tab-3','tab-4','tab-5','tab-6','tab-7','tab-files','tab-hist','tab-stats','tab-users','tab-info'].forEach(t =>
     $(`#${t}`).classList.toggle('active', t === id));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.target === id));
   sidebarTouched = true;

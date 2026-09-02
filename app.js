@@ -262,8 +262,7 @@ function captchaHtml() {
 }
 function checkCaptcha() {
   const v = parseInt($('#captchaAns').value, 10);
-  if (v !== captchaAnswer()) { genCaptcha(); return false; }
-  return true;
+  return v === captchaAnswer();
 }
 
 function showLogin() {
@@ -303,7 +302,8 @@ function showLogin() {
         <div class="ps-count" id="psCount"></div>
       </div>
     </div>
-  </div>`;
+  </div>
+  <div id="toast" class="toast"></div>`;
   restoreSavedLogin();
   loadLoginData();
 }
@@ -311,6 +311,7 @@ function showLogin() {
 let LOGIN_SCHOOLS = [];
 function loginSchoolClear() {
   $('#psSearch').value = '';
+  LOGIN_SCHOOL_ID = '';
   loginSchoolFilter('');
 }
 function loginSchoolFilter(q) {
@@ -833,9 +834,8 @@ function initPinBar() {
     }
   }
   $('#gpsBtn').onclick = async () => {
-    if (!navigator.geolocation) { toast('อุปกรณ์ไม่รองรับ GPS', false); return;
-      toast('กำลังค้นหาพิกัด... (อาจใช้เวลา 15-30 วินาที)', false);
-    }
+    if (!navigator.geolocation) { toast('อุปกรณ์ไม่รองรับ GPS', false); return; }
+    toast('กำลังค้นหาพิกัด... (อาจใช้เวลา 15-30 วินาที)', false);
     navigator.geolocation.getCurrentPosition(p => {
       const lat = p.coords.latitude.toFixed(6), lng = p.coords.longitude.toFixed(6);
       $('#coords').value = lat + ', ' + lng;
