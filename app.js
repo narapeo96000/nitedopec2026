@@ -255,11 +255,6 @@ function genCaptcha() {
   if (CAPTCHA_OP === '-' && CAPTCHA_A < CAPTCHA_B) { const t = CAPTCHA_A; CAPTCHA_A = CAPTCHA_B; CAPTCHA_B = t; }
 }
 function captchaAnswer() { return CAPTCHA_OP === '+' ? CAPTCHA_A + CAPTCHA_B : CAPTCHA_A - CAPTCHA_B; }
-function captchaHtml() {
-  genCaptcha();
-  return `<label class="captcha-row">验证码: <b>${CAPTCHA_A} ${CAPTCHA_OP} ${CAPTCHA_B} = ?</b>
-    <input type="number" id="captchaAns" required placeholder="?" autocomplete="off"></label>`;
-}
 function checkCaptcha() {
   const v = parseInt($('#captchaAns').value, 10);
   return v === captchaAnswer();
@@ -269,37 +264,82 @@ function showLogin() {
   LOGIN_SCHOOL_ID = '';
   const app = $('#app');
   app.innerHTML = `
-  <div class="login-wrap">
-    <div class="login-split">
-      <div class="login-box">
-        <div class="brand"><div class="brand-ic">🏫</div><div><h1>ระบบนิเทศออนไลน์</h1><p>สถานศึกษาเอกชนในระบบ จังหวัดนราธิวาส</p></div></div>
-        <form id="loginForm" onsubmit="return doLogin(event)">
-          <div id="loginMsg" class="login-msg"></div>
-          <label>Username <input type="text" id="username" autocomplete="username" required></label>
-          <label>Password
-            <div class="pw-row"><input type="password" id="password" autocomplete="current-password" required>
-            <button type="button" class="pw-eye" onclick="togglePw()" id="pwEye">👁</button></div>
-          </label>
-          <div class="opt-row">
-            <label class="chk"><input type="checkbox" id="showPass" onchange="togglePw()"> แสดงรหัสผ่าน</label>
-            <label class="chk"><input type="checkbox" id="rememberPass"> จดจำการเข้าสู่ระบบ</label>
-          </div>
-          <button type="submit" class="btn btn-primary btn-block">เข้าสู่ระบบ</button>
-        </form>
-        <div class="login-alt">ยังไม่มีบัญชี? <a href="#" onclick="showRegister();return false;">สมัครสมาชิก</a></div>
-      </div>
-      <div class="login-panel">
-        <h2>📊 สถิติสถานศึกษาเอกชน จ.นราธิวาส</h2>
-        <div class="ps-stat">
-          <div class="ps-stat-card"><div class="ps-stat-num" id="psSchools">-</div><div class="ps-stat-label">สถานศึกษา</div></div>
-          <div class="ps-stat-card"><div class="ps-stat-num" id="psEval">-</div><div class="ps-stat-label">ครั้งที่นิเทศ</div></div>
-          <div class="ps-stat-card"><div class="ps-stat-num" id="psStaff">-</div><div class="ps-stat-label">ครู/บุคลากร</div></div>
-          <div class="ps-stat-card"><div class="ps-stat-num" id="psStudents">-</div><div class="ps-stat-label">นักเรียน</div></div>
+  <div class="landing">
+    <div class="container">
+      <div class="brand">
+        <div class="logo">🏫</div>
+        <h1>ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส</h1>
+        <p class="sub-title">นิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียนโรงเรียนเอกชนในระบบ<br>(แบบสอนสามัญ · แบบสอนสามัญควบคู่ศาสนาอิสลาม)</p>
+        <div class="org-line">
+          <span class="org">สำนักงานจังหวัดนราธิวาส</span> |
+          <span class="org">สำนักงานศึกษาธิการจังหวัดนราธิวาส</span> |
+          <span class="org">สำนักงานการศึกษาเอกชนจังหวัดนราธิวาส</span>
         </div>
-        <div class="ps-reset"><button type="button" onclick="loginSchoolClear()">↩ ล้างการเลือก</button></div>
-        <input type="text" id="psSearch" class="ps-search" placeholder="🔍 พิมพ์ค้นหาโรงเรียน..." oninput="loginSchoolFilter(this.value)">
-        <div class="ps-list" id="psList"><div class="loading" style="color:#ccfbf1">กำลังโหลดรายชื่อ...</div></div>
-        <div class="ps-count" id="psCount"></div>
+        <div class="highlight">
+          <div class="hl-tag">✨ นิเทศโรงเรียนเอกชนยุคใหม่ ✨</div>
+          <div class="hl-big">นิเทศยุคใหม่ เข้าใจ เข้าถึง พัฒนาคุณภาพผู้เรียน</div>
+        </div>
+        <div class="version-badge">📱 รุ่นพร้อมใช้งานภาคสนาม (Mobile Optimized)</div>
+      </div>
+
+      <div class="card auth-card">
+        <h4 class="text-center mb-3" style="color:#065f46;margin-top:0;">เข้าสู่ระบบ</h4>
+        <div id="loginMsg" class="auth-msg"></div>
+        <label>Username</label>
+        <input type="text" id="username" class="form-control mb-3" autocomplete="username">
+        <label>Password</label>
+        <input type="password" id="password" class="form-control" autocomplete="current-password" onkeypress="if(event.key==='Enter')doLogin(event)">
+        <div class="checkbox-row">
+          <label><input type="checkbox" id="showPass" onchange="togglePw()"> แสดงรหัสผ่าน</label>
+          <label><input type="checkbox" id="rememberPass"> จดจำรหัสผ่าน</label>
+        </div>
+        <label>เลือกสถานศึกษาที่จะนิเทศ <span class="small text-muted">(พิมพ์ค้นหาได้)</span></label>
+        <div class="position-relative">
+          <input type="text" id="lgSchoolSearch" class="form-control" placeholder="ชื่อโรงเรียน / รหัส / ตำบล / อำเภอ..."
+                 autocomplete="off" oninput="loginSchoolFilter(this.value)" onkeydown="loginSchoolKey(event)">
+          <div id="lgSchoolSuggest" class="suggest-box d-none"></div>
+        </div>
+        <div id="lgSelInfo" class="info-box d-none">
+          <b id="lgSelName"></b><br><span id="lgSelDetail" class="small text-muted"></span>
+        </div>
+        <button class="btn btn-primary w-100 mt-3" onclick="doLogin(event)">เข้าสู่ระบบ</button>
+        <p class="text-center mt-3 mb-0 small">ยังไม่มีบัญชี? <a href="javascript:void(0)" class="login-link" onclick="showRegister()">สมัครสมาชิก</a></p>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><h4>📊 สถิติระบบนิเทศออนไลน์</h4><span class="badge">อัปเดตอัตโนมัติ</span></div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="lbl">🏫 สถานศึกษา</div><div class="val" id="st_schools">—</div></div>
+          <div class="stat-card"><div class="lbl">📚 แบบสอนสามัญ</div><div class="val" id="st_common">—</div></div>
+          <div class="stat-card"><div class="lbl">🕌 สามัญควบคู่ศาสนา</div><div class="val" id="st_commonRel">—</div></div>
+          <div class="stat-card"><div class="lbl">📝 ครั้งที่นิเทศ</div><div class="val" id="st_eval">—</div></div>
+          <div class="stat-card"><div class="lbl">👨‍🏫 ครู/บุคลากร</div><div class="val" id="st_staff">—</div></div>
+          <div class="stat-card"><div class="lbl">🎒 นักเรียน</div><div class="val" id="st_students">—</div></div>
+        </div>
+        <h5>🕒 การนิเทศครั้งล่าสุด (TOP 10)</h5>
+        <div class="table-wrap">
+          <table class="latest-table">
+            <thead><tr><th>#</th><th>🏫 สถานศึกษา</th><th>📅 วันที่</th><th>💯 ร้อยละ</th><th>🏅 ระดับ</th></tr></thead>
+            <tbody id="latestEvalBody"><tr><td colspan="5" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><h4>🏫 ทำเนียบสถานศึกษาเอกชน</h4><span class="badge" id="dirCount">0 รายการ</span></div>
+        <label>🔍 ค้นหาโรงเรียน <span class="small text-muted">(กรองข้อมูลแบบทันที)</span></label>
+        <input type="text" id="dirSearch" class="form-control" placeholder="พิมพ์ รหัส / ชื่อโรงเรียน / ที่อยู่ / ตำบล / อำเภอ..." autocomplete="off" oninput="renderDir()">
+        <div class="table-wrap mt-2">
+          <table class="addr-table">
+            <thead><tr><th>รหัส/ชื่อสถานศึกษา</th><th>ที่อยู่</th><th>อำเภอ</th><th>ตำบล</th><th>โทรศัพท์</th><th>บุคลากร</th><th>ผู้เรียน</th></tr></thead>
+            <tbody id="dirBody"><tr><td colspan="7" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="app-footer">
+        ระบบนิเทศออนไลน์สำหรับสถานศึกษาเอกชนในระบบ จังหวัดนราธิวาส<br>
+        <span class="org">สำนักงานการศึกษาเอกชนจังหวัดนราธิวาส</span>
       </div>
     </div>
   </div>
@@ -309,57 +349,93 @@ function showLogin() {
 }
 
 let LOGIN_SCHOOLS = [];
-function loginSchoolClear() {
-  $('#psSearch').value = '';
-  LOGIN_SCHOOL_ID = '';
-  loginSchoolFilter('');
-}
+function numbered(n) { const v = Number(n) || 0; return v ? v.toLocaleString() : '0'; }
+function levelCls(l) { return ({ 'ดีมาก': 'lv-green', 'ดี': 'lv-blue', 'พอใช้': 'lv-amber' })[l] || 'lv-red'; }
+function hideLoginSuggest() { const b = $('#lgSchoolSuggest'); if (b) b.classList.add('d-none'); }
+function loginSchoolKey(e) { if (e.key === 'Escape') hideLoginSuggest(); }
 function loginSchoolFilter(q) {
   const kw = (q || '').toLowerCase().trim();
   const list = LOGIN_SCHOOLS.filter(s =>
     !kw || (s.name || '').toLowerCase().includes(kw) ||
+    String(s.id || '').includes(kw) ||
     (s.dist || '').toLowerCase().includes(kw) ||
     (s.subdist || '').toLowerCase().includes(kw) ||
-    (s.form || '').toLowerCase().includes(kw));
-  renderLoginSchools(list);
-}
-function renderLoginSchools(list) {
-  const box = $('#psList');
+    (s.form || '').toLowerCase().includes(kw)).slice(0, 30);
+  const box = $('#lgSchoolSuggest');
   if (!box) return;
-  if (!list.length) { box.innerHTML = `<div class="empty" style="background:transparent;border-color:rgba(255,255,255,.2);color:#a7f3d0">ไม่พบสถานศึกษา</div>`; $('#psCount').textContent = ''; return; }
+  if (!list.length) { box.classList.add('d-none'); return; }
+  box.classList.remove('d-none');
   box.innerHTML = list.map(s => `
-    <div class="ps-item ${s.id === LOGIN_SCHOOL_ID ? 'selected' : ''}" onclick="loginPickSchool('${esc(s.id)}')">
-      <div class="ps-item-name"><b>${esc(s.name)}</b><small>${esc(s.dist || '')} ${esc(s.subdist || '')}</small></div>
-      <span class="ps-item-form">${esc(s.form || '')}</span>
-    </div>`).join('');
-  $('#psCount').textContent = 'พบ ' + list.length + ' จาก ' + LOGIN_SCHOOLS.length + ' แห่ง';
+    <button type="button" class="suggest-item ${s.id === LOGIN_SCHOOL_ID ? 'active' : ''}" onclick="loginPickSchool('${esc(s.id)}')">
+      <span class="oppts">${esc(s.name)} <small>(${esc(s.id)})</small></span>
+      <small>${esc(s.form || '')} · ${esc(s.dist || '')} ${esc(s.subdist || '')}</small>
+    </button>`).join('');
 }
 function loginPickSchool(id) {
   LOGIN_SCHOOL_ID = id;
   const s = LOGIN_SCHOOLS.find(x => x.id === id);
-  renderLoginSchoolsFilterKeep();
+  hideLoginSuggest();
+  const info = $('#lgSelInfo'); if (info) info.classList.remove('d-none');
+  const n = $('#lgSelName'); if (n) n.textContent = s ? s.name : id;
+  const d = $('#lgSelDetail'); if (d) d.textContent = s ? (s.form + ' · ' + (s.dist || '') + ' ' + (s.subdist || '')) : '';
+  const inp = $('#lgSchoolSearch'); if (inp) inp.value = s ? s.name : id;
   toast(s ? ('เลือก: ' + s.name) : 'เลือก: ' + id, true);
 }
-function renderLoginSchoolsFilterKeep() {
-  loginSchoolFilter($('#psSearch').value);
+function renderDir() {
+  const body = $('#dirBody');
+  if (!body) return;
+  const kw = (($('#dirSearch') || {}).value || '').toLowerCase().trim();
+  const list = LOGIN_SCHOOLS.filter(s =>
+    !kw || String(s.id || '').includes(kw) ||
+    (s.name || '').toLowerCase().includes(kw) ||
+    (s.address || '').toLowerCase().includes(kw) ||
+    (s.dist || '').toLowerCase().includes(kw) ||
+    (s.subdist || '').toLowerCase().includes(kw) ||
+    (s.form || '').toLowerCase().includes(kw));
+  const c = $('#dirCount'); if (c) c.textContent = list.length + ' รายการ';
+  if (!list.length) { body.innerHTML = `<tr><td colspan="7" class="text-center text-muted">ไม่พบสถานศึกษา</td></tr>`; return; }
+  body.innerHTML = list.map(s => `
+    <tr>
+      <td><b class="oppts">${esc(s.name)}</b><br><small class="text-muted">รหัส ${esc(s.id)} · ${esc(s.form || '')}</small></td>
+      <td data-label="ที่อยู่">${esc(s.address || '-')}</td>
+      <td data-label="อำเภอ">${esc(s.dist || '-')}</td>
+      <td data-label="ตำบล">${esc(s.subdist || '-')}</td>
+      <td data-label="โทรศัพท์">${esc(s.phone || '-')}</td>
+      <td data-label="บุคลากร">${numbered(s.staff)}</td>
+      <td data-label="ผู้เรียน">${numbered(s.students)}</td>
+    </tr>`).join('');
 }
 async function loadLoginData() {
-  // สถิติ
   const st = await post('getStatsPublic');
   if (st && st.success && st.data) {
     const d = st.data;
-    const set = (id, v) => { const e = $('#' + id); if (e) e.textContent = v; };
-    set('psSchools', d.totalSchools); set('psEval', d.totalEval);
-    set('psStaff', d.staff); set('psStudents', d.students);
+    const set = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+    set('st_schools', numbered(d.totalSchools));
+    set('st_common', numbered(d.typeCount && d.typeCount['แบบสอนสามัญ']));
+    set('st_commonRel', numbered(d.typeCount && d.typeCount['แบบสอนสามัญควบคู่ศาสนาอิสลาม']));
+    set('st_eval', numbered(d.totalEval));
+    set('st_staff', numbered(d.staff));
+    set('st_students', numbered(d.students));
+    const lb = $('#latestEvalBody');
+    if (lb) {
+      const rows = Array.isArray(d.latest) ? d.latest : [];
+      lb.innerHTML = rows.length ? rows.map((x, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><b class="oppts">${esc(x.name || '')}</b><br><small class="text-muted">${esc(x.form || '')}</small></td>
+          <td>${esc(x.timestamp || '-')}</td>
+          <td>${x.pct === '' || x.pct == null ? '-' : x.pct}</td>
+          <td><span class="lv ${levelCls(x.level)}">${esc(x.level || '-')}</span></td>
+        </tr>`).join('') : `<tr><td colspan="5" class="text-center text-muted">ยังไม่มีข้อมูลการนิเทศ</td></tr>`;
+    }
   }
-  // รายชื่อโรงเรียน
   const r = await post('getSchoolListPublic');
   if (r && r.success && r.data) {
     LOGIN_SCHOOLS = r.data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    renderLoginSchools(LOGIN_SCHOOLS);
+    renderDir();
   } else {
-    const box = $('#psList');
-    if (box) box.innerHTML = `<div class="empty" style="background:transparent;border-color:rgba(255,255,255,.2);color:#a7f3d0">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อได้')}</div>`;
+    const body = $('#dirBody');
+    if (body) body.innerHTML = `<tr><td colspan="7" class="text-center text-muted">${esc((r || {}).message || 'ไม่สามารถโหลดรายชื่อได้')}</td></tr>`;
   }
 }
 
@@ -372,39 +448,61 @@ function restoreSavedLogin() {
 
 function togglePw() {
   const p = $('#password');
+  if (!p) return;
   const isShow = $('#showPass') ? $('#showPass').checked : false;
   p.type = isShow ? 'text' : 'password';
-  const eye = $('#pwEye');
-  if (eye) eye.textContent = isShow ? '🙈' : '👁';
+}
+
+function regRefreshCaptcha() {
+  genCaptcha();
+  const q = $('#regCaptchaQ');
+  if (q) q.textContent = `${CAPTCHA_A} ${CAPTCHA_OP} ${CAPTCHA_B} = ?`;
+  const i = $('#captchaAns');
+  if (i) i.value = '';
 }
 
 function showRegister() {
   genCaptcha();
   const app = $('#app');
   app.innerHTML = `
-  <div class="login-wrap">
-    <div class="login-box">
-      <div class="brand"><div class="brand-ic">🏫</div><div><h1>สมัครสมาชิก</h1><p>ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ</p></div></div>
-      <form id="regForm" onsubmit="return doRegister(event)">
-        <label>Username <input type="text" id="rUser" required></label>
-        <label>Password <input type="password" id="rPass" required></label>
-        <label>ชื่อ-นามสกุล <input type="text" id="rName" required></label>
-        <label>เบอร์โทร <input type="tel" id="rTel"></label>
-        ${captchaHtml()}
-        <div id="regMsg" class="login-msg"></div>
-        <button type="submit" class="btn btn-primary btn-block">สมัครสมาชิก</button>
-      </form>
-      <div class="login-alt">มีบัญชีแล้ว? <a href="#" onclick="showLogin();return false;">กลับไปเข้าสู่ระบบ</a></div>
+  <div class="landing">
+    <div class="container">
+      <div class="card auth-card">
+        <div class="brand" style="margin:0 0 6px;">
+          <div class="logo" style="width:64px;height:64px;font-size:1.8rem;border-radius:20px;">🏫</div>
+          <h1>สมัครสมาชิก</h1>
+          <p class="sub-title">ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส</p>
+        </div>
+        <div id="regMsg" class="auth-msg"></div>
+        <label>ชื่อ-นามสกุล</label>
+        <input type="text" id="rName" class="form-control mb-3">
+        <label>เบอร์โทรศัพท์</label>
+        <input type="tel" id="rTel" class="form-control mb-3">
+        <label>Username</label>
+        <input type="text" id="rUser" class="form-control mb-3">
+        <label>Password</label>
+        <input type="password" id="rPass" class="form-control">
+        <label>ยืนยันตัวตน (กันสแปม)</label>
+        <div class="captcha-row">
+          <span id="regCaptchaQ" class="captcha-q">${CAPTCHA_A} ${CAPTCHA_OP} ${CAPTCHA_B} = ?</span>
+          <input type="text" id="captchaAns" class="form-control" placeholder="กรอกคำตอบ" autocomplete="off" inputmode="numeric">
+          <button type="button" class="captcha-refresh" onclick="regRefreshCaptcha()" title="เปลี่ยนคำถาม">🔄</button>
+        </div>
+        <button class="btn btn-primary w-100 mt-3" onclick="doRegister(event)">สมัครสมาชิก</button>
+        <p class="text-center mt-3 mb-0 small">มีบัญชีแล้ว? <a href="javascript:void(0)" class="login-link" onclick="showLogin()">กลับไปเข้าสู่ระบบ</a></p>
+      </div>
     </div>
-  </div>`;
+  </div>
+  <div id="toast" class="toast"></div>`;
 }
 
 async function doLogin(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
   const u = $('#username').value.trim();
   const p = $('#password').value;
   const msg = $('#loginMsg');
-  msg.className = 'login-msg err';
+  if (!u || !p) { msg.className = 'auth-msg err'; msg.textContent = 'กรุณากรอก Username และ Password'; return false; }
+  msg.className = 'auth-msg err';
   msg.textContent = 'กำลังตรวจสอบข้อมูล...';
   const r = await post('login', { username: u, password: p });
   if (r && r.success) {
@@ -414,7 +512,7 @@ async function doLogin(e) {
     } else {
       localStorage.removeItem(REMEMBER_KEY);
     }
-    msg.className = 'login-msg ok';
+    msg.className = 'auth-msg ok';
     msg.textContent = 'เข้าสู่ระบบสำเร็จ! กำลังโหลดระบบ...';
     if (LOGIN_SCHOOL_ID) {
       startDashWithSchool(LOGIN_SCHOOL_ID);
@@ -422,25 +520,23 @@ async function doLogin(e) {
       startDash();
     }
   } else {
-    msg.className = 'login-msg err';
+    msg.className = 'auth-msg err';
     msg.textContent = (r && r.message) || 'เข้าสู่ระบบไม่สำเร็จ';
   }
   return false;
 }
 
 async function doRegister(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
   if (!checkCaptcha()) {
-    genCaptcha();
+    regRefreshCaptcha();
     const msg = $('#regMsg');
-    msg.className = 'login-msg err';
+    msg.className = 'auth-msg err';
     msg.textContent = 'รหัสตรวจสอบไม่ถูกต้อง กรุณาลองใหม่';
-    const cap = document.querySelector('.captcha-row b');
-    if (cap) cap.textContent = `${CAPTCHA_A} ${CAPTCHA_OP} ${CAPTCHA_B} = ?`;
     return false;
   }
   const msg = $('#regMsg');
-  msg.className = 'login-msg';
+  msg.className = 'auth-msg';
   msg.textContent = 'กำลังส่งข้อมูล...';
   const r = await post('register', {
     username: $('#rUser').value.trim(),
@@ -448,13 +544,9 @@ async function doRegister(e) {
     fname: $('#rName').value.trim(),
     tel: $('#rTel').value.trim()
   });
-  msg.className = r && r.success ? 'login-msg ok' : 'login-msg err';
+  msg.className = r && r.success ? 'auth-msg ok' : 'auth-msg err';
   msg.textContent = (r && r.message) || '';
-  if (r && r.success) {
-    genCaptcha();
-    const cap = document.querySelector('.captcha-row b');
-    if (cap) cap.textContent = `${CAPTCHA_A} ${CAPTCHA_OP} ${CAPTCHA_B} = ?`;
-  }
+  if (r && r.success) regRefreshCaptcha();
   return false;
 }
 
