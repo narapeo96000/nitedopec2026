@@ -57,6 +57,8 @@ function doPost(e) {
       res = setUserStatus(payload);
     } else if (action === 'getSchoolList') {
       res = getSchoolList();
+    } else if (action === 'getSchoolListPublic') {
+      res = getSchoolList();
     } else if (action === 'getStatsSchool') {
       res = getStatsSchool();
     } else if (action === 'getSchoolData') {

@@ -245,7 +245,29 @@ const ALL_SC = [SC0, SC1, SC2, SNA];
 // ============================================================
 const REMEMBER_KEY = "opec_login";
 
+let CAPTCHA_A = 0, CAPTCHA_B = 0, CAPTCHA_OP = '+';
+let LOGIN_SCHOOL_ID = '';
+
+function genCaptcha() {
+  CAPTCHA_A = Math.floor(Math.random() * 20) + 1;
+  CAPTCHA_B = Math.floor(Math.random() * 20) + 1;
+  CAPTCHA_OP = Math.random() < 0.5 ? '+' : '-';
+  if (CAPTCHA_OP === '-' && CAPTCHA_A < CAPTCHA_B) { const t = CAPTCHA_A; CAPTCHA_A = CAPTCHA_B; CAPTCHA_B = t; }
+}
+function captchaAnswer() { return CAPTCHA_OP === '+' ? CAPTCHA_A + CAPTCHA_B : CAPTCHA_A - CAPTCHA_B; }
+function captchaHtml() {
+  genCaptcha();
+  return `<label class="captcha-row">验证码: <b>${CAPTCHA_A} ${CAPTCHA_OP} ${CAPTCHA_B} = ?</b>
+    <input type="number" id="captchaAns" required placeholder="?" autocomplete="off"></label>`;
+}
+function checkCaptcha() {
+  const v = parseInt($('#captchaAns').value, 10);
+  if (v !== captchaAnswer()) { genCaptcha(); return false; }
+  return true;
+}
+
 function showLogin() {
+  LOGIN_SCHOOL_ID = '';
   const app = $('#app');
   app.innerHTML = `
   <div class="login-wrap">
@@ -256,6 +278,9 @@ function showLogin() {
         <label>Password
           <div class="pw-row"><input type="password" id="password" autocomplete="current-password" required>
           <button type="button" class="pw-eye" onclick="togglePw()" id="pwEye">👁</button></div>
+        </label>
+        <label class="login-sel-school">🏫 เลือกโรงเรียนที่จะเข้านิเทศ
+          <select id="loginSchoolSel"><option value="">— ไม่เลือก (ไปหน้า Dashboard) —</option></select>
         </label>
         <div class="opt-row">
           <label class="chk"><input type="checkbox" id="showPass" onchange="togglePw()"> แสดงรหัสผ่าน</label>
@@ -268,6 +293,18 @@ function showLogin() {
     </div>
   </div>`;
   restoreSavedLogin();
+  loadLoginSchools();
+}
+
+async function loadLoginSchools() {
+  const r = await post('getSchoolListPublic');
+  if (r && r.success && r.data) {
+    const sel = $('#loginSchoolSel');
+    if (!sel) return;
+    const schools = r.data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    sel.innerHTML = '<option value="">— ไม่เลือก (ไปหน้า Dashboard) —</option>' +
+      schools.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+  }
 }
 
 function restoreSavedLogin() {
@@ -286,6 +323,7 @@ function togglePw() {
 }
 
 function showRegister() {
+  genCaptcha();
   const app = $('#app');
   app.innerHTML = `
   <div class="login-wrap">
@@ -296,6 +334,7 @@ function showRegister() {
         <label>Password <input type="password" id="rPass" required></label>
         <label>ชื่อ-นามสกุล <input type="text" id="rName" required></label>
         <label>เบอร์โทร <input type="tel" id="rTel"></label>
+        ${captchaHtml()}
         <div id="regMsg" class="login-msg"></div>
         <button type="submit" class="btn btn-primary btn-block">สมัครสมาชิก</button>
       </form>
@@ -308,6 +347,8 @@ async function doLogin(e) {
   e.preventDefault();
   const u = $('#username').value.trim();
   const p = $('#password').value;
+  const sel = $('#loginSchoolSel');
+  LOGIN_SCHOOL_ID = sel ? sel.value : '';
   const msg = $('#loginMsg');
   msg.className = 'login-msg err';
   msg.textContent = 'กำลังตรวจสอบข้อมูล...';
@@ -321,7 +362,11 @@ async function doLogin(e) {
     }
     msg.className = 'login-msg ok';
     msg.textContent = 'เข้าสู่ระบบสำเร็จ! กำลังโหลดระบบ...';
-    startDash();
+    if (LOGIN_SCHOOL_ID) {
+      startDashWithSchool(LOGIN_SCHOOL_ID);
+    } else {
+      startDash();
+    }
   } else {
     msg.className = 'login-msg err';
     msg.textContent = (r && r.message) || 'เข้าสู่ระบบไม่สำเร็จ';
@@ -331,6 +376,15 @@ async function doLogin(e) {
 
 async function doRegister(e) {
   e.preventDefault();
+  if (!checkCaptcha()) {
+    genCaptcha();
+    const msg = $('#regMsg');
+    msg.className = 'login-msg err';
+    msg.textContent = 'รหัสตรวจสอบไม่ถูกต้อง กรุณาลองใหม่';
+    const cap = document.querySelector('.captcha-row b');
+    if (cap) cap.textContent = `${CAPTCHA_A} ${CAPTCHA_OP} ${CAPTCHA_B} = ?`;
+    return false;
+  }
   const msg = $('#regMsg');
   msg.className = 'login-msg';
   msg.textContent = 'กำลังส่งข้อมูล...';
@@ -342,6 +396,11 @@ async function doRegister(e) {
   });
   msg.className = r && r.success ? 'login-msg ok' : 'login-msg err';
   msg.textContent = (r && r.message) || '';
+  if (r && r.success) {
+    genCaptcha();
+    const cap = document.querySelector('.captcha-row b');
+    if (cap) cap.textContent = `${CAPTCHA_A} ${CAPTCHA_OP} ${CAPTCHA_B} = ?`;
+  }
   return false;
 }
 
@@ -426,9 +485,252 @@ async function startDash() {
   } else {
     $('#pinCard').innerHTML = `<div class="empty">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อโรงเรียนได้')}</div>`;
   }
-  el('tab-1').innerHTML = `<div class="panel-head"><h2>ยินดีต้อนรับสู่ระบบ</h2></div>
-    <div class="empty big">เลือกสถานศึกษาแล้วกดปุ่ม "📂 เลือกดูข้อมูล" ด้านซ้าย เพื่อเริ่มการนิเทศ<br><small>ตามแผนการนิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียนโรงเรียนเอกชนในระบบ จ.นราธิวาส (ปีละ 2 ครั้ง)</small></div>`;
+
+  // แสดง Dashboard หน้าแรก
+  showDashboard();
   $('#toast').className = 'toast';
+}
+
+// ============================================================
+// เข้าสู่ระบบแล้วเปิดโรงเรียนที่เลือกจากหน้า Login ทันที
+// ============================================================
+async function startDashWithSchool(schoolId) {
+  const app = $('#app');
+  app.innerHTML = `
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="hamburger" onclick="toggleSidebar()" id="hamburgerBtn">☰</button>
+      <div class="tb-brand">🏫 <b>${APP_NAME}</b></div>
+    </div>
+    <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small>
+      <button class="btn btn-mini" onclick="logout()">ออกจากระบบ</button>
+    </div>
+  </div>
+  <div class="main">
+    <aside class="side" id="sidebar">
+      <div class="side-close"><button onclick="toggleSidebar()">✕ ปิด</button></div>
+      <div class="side-card">
+        <h4>เลือกสถานศึกษา</h4>
+        <select id="schoolSelect" onchange="loadSchool(this.value)"><option value="">— เลือกสถานศึกษา —</option></select>
+        <div id="pinCard"></div>
+        <div class="side-actions">
+          <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
+        </div>
+      </div>
+      <div class="nav">
+        <button class="tb-nav tab-btn active" data-target="tab-1" onclick="switchTab('tab-1')">📁 ข้อมูลพื้นฐาน</button>
+        <button class="tb-nav tab-btn" data-target="tab-2" onclick="switchTab('tab-2')">🏛️ บริหาร/ระบบคุณภาพ</button>
+        <button class="tb-nav tab-btn" data-target="tab-3" onclick="switchTab('tab-3')">📚 หลักสูตร/จัดการเรียนรู้</button>
+        <button class="tb-nav tab-btn" data-target="tab-4" onclick="switchTab('tab-4')">📊 วัดผล/ผลผู้เรียน</button>
+        <button class="tb-nav tab-btn" data-target="tab-5" onclick="switchTab('tab-5')">🧐 ตรวจเยี่ยมชั้นเรียน</button>
+        <button class="tb-nav tab-btn" data-target="tab-6" onclick="switchTab('tab-6')">🔧 สะท้อนผล/แผนพัฒนา</button>
+        <button class="tb-nav tab-btn" data-target="tab-7" onclick="switchTab('tab-7')">✅ ติดตาม/สรุป</button>
+        <button class="tb-nav tab-btn" data-target="tab-files" onclick="showUploadsPanel()">📎 ไฟล์/หลักฐาน</button>
+        <div class="nav-sep"></div>
+        <button class="tb-nav tab-btn" data-target="tab-hist" onclick="showEvalHistory()">📜 ประวัติการนิเทศ</button>
+        <button class="tb-nav tab-btn" data-target="tab-stats" onclick="showStatsPanel()">📊 สถิติระบบ</button>
+        ${CURRENT_USER && CURRENT_USER.role === 'ผู้ดูแลระบบ' ? `<button class="tb-nav tab-btn" data-target="tab-users" onclick="showUsersPanel()">👥 จัดการผู้ใช้</button>` : ''}
+        <button class="tb-nav tab-btn" data-target="tab-info" onclick="showInfo()">ℹ️ วิธีใช้</button>
+      </div>
+    </aside>
+    <section class="content">
+      <div id="scoreBar"></div>
+      <div class="panels">
+        <div id="tab-1" class="panel active"></div>
+        <div id="tab-2" class="panel"></div>
+        <div id="tab-3" class="panel"></div>
+        <div id="tab-4" class="panel"></div>
+        <div id="tab-5" class="panel"></div>
+        <div id="tab-6" class="panel"></div>
+        <div id="tab-7" class="panel"></div>
+        <div id="tab-files" class="panel"><div id="filesWrap"></div></div>
+        <div id="tab-hist" class="panel"><div id="histWrap"></div></div>
+        <div id="tab-stats" class="panel"><div id="statsWrap"></div></div>
+        <div id="tab-users" class="panel"><div id="usersWrap"></div></div>
+        <div id="tab-info" class="panel"><div id="infoWrap"></div></div>
+      </div>
+    </section>
+  </div>
+  <div id="toast" class="toast"></div>`;
+
+  const r = await post('getSchoolList');
+  if (r && r.success) {
+    SCHOOLS = (r.data || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const sel = $('#schoolSelect');
+    sel.innerHTML = '<option value="">— เลือกสถานศึกษา —</option>' + SCHOOLS.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+    if (!SCHOOLS.length) $('#pinCard').innerHTML = `<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ</div>`;
+  } else {
+    $('#pinCard').innerHTML = `<div class="empty">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อโรงเรียนได้')}</div>`;
+  }
+
+  // เลือกโรงเรียนที่เลือกจากหน้า Login ทันที
+  const sel = $('#schoolSelect');
+  if (sel && schoolId) {
+    sel.value = schoolId;
+    loadSchool(schoolId);
+  } else {
+    showDashboard();
+  }
+  $('#toast').className = 'toast';
+}
+
+// ============================================================
+// Dashboard หน้าแรก (แสดงหลังเข้าสู่ระบบ)
+// ============================================================
+async function showDashboard() {
+  // โหลดสถิติ
+  const stats = await post('getStatsSchool');
+  const d = (stats && stats.success) ? stats.data : { totalSchools: 0, totalEval: 0, totalUsers: 0, staff: 0, students: 0, avgPct: 0, levelCounts: {}, latest: [] };
+
+  // ดึงข้อมูลร่างล่าสุด
+  let draftInfo = null;
+  try {
+    const raw = localStorage.getItem(AUTO_SAVE_KEY);
+    if (raw) {
+      const draft = JSON.parse(raw);
+      if (draft.schoolId && draft.timestamp) {
+        const school = SCHOOLS.find(s => s.id === draft.schoolId);
+        draftInfo = { school: school ? school.name : draft.schoolId, time: new Date(draft.timestamp).toLocaleString('th') };
+      }
+    }
+  } catch(e) {}
+
+  const root = el('tab-1');
+  root.innerHTML = `
+    <div class="dash-hero">
+      <div class="dash-hero-text">
+        <h1>👋 สวัสดี ${esc(CURRENT_USER ? CURRENT_USER.fname : '')}</h1>
+        <p>ยินดีต้อนรับสู่ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส</p>
+      </div>
+      <button class="btn-start" onclick="startInspection()">
+        <span class="btn-start-icon">🚀</span>
+        <span class="btn-start-text">เริ่มการนิเทศ</span>
+        <span class="btn-start-sub">เลือกสถานศึกษาและเริ่มปฏิบัติงานภาคสนาม</span>
+      </button>
+    </div>
+
+    ${draftInfo ? `
+    <div class="dash-draft" onclick="resumeDraft('${esc(draftInfo.school)}')">
+      <span>📝</span>
+      <div><b>พบข้อมูลร่างล่าสุด</b><small>${esc(draftInfo.school)} · ${draftInfo.time}</small></div>
+      <span class="btn btn-mini">กู้คืน →</span>
+    </div>` : ''}
+
+    <div class="dash-stats">
+      <div class="dash-stat-card" onclick="startInspection()">
+        <div class="dash-stat-icon">🏫</div>
+        <div class="dash-stat-num">${d.totalSchools}</div>
+        <div class="dash-stat-label">สถานศึกษาทั้งหมด</div>
+      </div>
+      <div class="dash-stat-card" onclick="showEvalHistory()">
+        <div class="dash-stat-icon">📋</div>
+        <div class="dash-stat-num">${d.totalEval}</div>
+        <div class="dash-stat-label">ครั้งที่นิเทศแล้ว</div>
+      </div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-icon">👨‍🏫</div>
+        <div class="dash-stat-num">${d.staff}</div>
+        <div class="dash-stat-label">ครู/บุคลากร</div>
+      </div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-icon">🎓</div>
+        <div class="dash-stat-num">${d.students}</div>
+        <div class="dash-stat-label">นักเรียน</div>
+      </div>
+    </div>
+
+    <div class="dash-section">
+      <h3>📊 สถิติการนิเทศ</h3>
+      <div class="dash-levels">
+        <div class="dash-level-item"><span class="dl-dot" style="background:#0f766e"></span>ดีมาก (≥80%) <b>${d.levelCounts['ดีมาก'] || 0}</b></div>
+        <div class="dash-level-item"><span class="dl-dot" style="background:#2563eb"></span>ดี (60-79%) <b>${d.levelCounts['ดี'] || 0}</b></div>
+        <div class="dash-level-item"><span class="dl-dot" style="background:#d97706"></span>พอใช้ (40-59%) <b>${d.levelCounts['พอใช้'] || 0}</b></div>
+        <div class="dash-level-item"><span class="dl-dot" style="background:#dc2626"></span>ต้องปรับปรุง (<40%) <b>${d.levelCounts['ต้องปรับปรุง'] || 0}</b></div>
+      </div>
+      <div class="dash-avg">ค่าเฉลี่ยร้อยละ: <b style="color:${getColor(d.avgPct)}">${d.avgPct}%</b></div>
+    </div>
+
+    <div class="dash-section">
+      <h3>📜 การนิเทศล่าสุด</h3>
+      ${d.latest.length ? d.latest.slice(0, 5).map(v => `
+        <div class="dash-recent">
+          <div class="dash-recent-info">
+            <b>${esc(v.name)}</b>
+            <small>${esc(v.form || '')} · ${esc(v.timestamp)}</small>
+          </div>
+          <div class="dash-recent-score">
+            <span class="chip" style="background:${getColor(v.pct)};font-size:12px">${v.pct}% ${esc(v.level)}</span>
+          </div>
+        </div>
+      `).join('') : '<div class="empty">ยังไม่มีประวัติการนิเทศ</div>'}
+    </div>
+
+    <div class="dash-section">
+      <h3>🏫 รายชื่อสถานศึกษา (${SCHOOLS.length} แห่ง)</h3>
+      <div class="dash-school-list">
+        ${SCHOOLS.slice(0, 10).map(s => `
+          <div class="dash-school-item" onclick="startInspectionSchool('${esc(s.id)}')">
+            <div class="dash-school-info">
+              <b>${esc(s.name)}</b>
+              <small>${esc(s.dist || '')} · ${esc(s.form || '')}</small>
+            </div>
+            <span class="btn btn-mini">เปิด →</span>
+          </div>
+        `).join('')}
+        ${SCHOOLS.length > 10 ? `<div class="dash-more">และอีก ${SCHOOLS.length - 10} แห่ง... <a href="#" onclick="startInspection();return false;">ดูทั้งหมด</a></div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// เริ่มการนิเทศ (เลือกสถานศึกษา)
+// ============================================================
+function startInspection() {
+  // แสดง dropdown เลือกสถานศึกษาแบบเต็มหน้าจอ
+  const root = el('tab-1');
+  root.innerHTML = `
+    <div class="dash-hero">
+      <div class="dash-hero-text">
+        <h1>🚀 เริ่มการนิเทศ</h1>
+        <p>เลือกสถานศึกษาที่ต้องการเข้าปฏิบัติงานภาคสนาม</p>
+      </div>
+    </div>
+    <div class="dash-section">
+      <div class="school-pick-grid">
+        ${SCHOOLS.map(s => `
+          <div class="school-pick-card" onclick="pickSchool('${esc(s.id)}')">
+            <div class="school-pick-icon">🏫</div>
+            <div class="school-pick-name">${esc(s.name)}</div>
+            <div class="school-pick-dist">${esc(s.dist || '-')} · ${esc(s.subdist || '-')}</div>
+            <div class="school-pick-form">${esc(s.form || '-')}</div>
+          </div>
+        `).join('')}
+        ${!SCHOOLS.length ? '<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ</div>' : ''}
+      </div>
+    </div>
+  `;
+  // sync sidebar dropdown
+  const sel = $('#schoolSelect');
+  if (sel) sel.value = '';
+}
+
+function startInspectionSchool(id) {
+  const sel = $('#schoolSelect');
+  if (sel) sel.value = id;
+  loadSchool(id);
+}
+
+function pickSchool(id) {
+  startInspectionSchool(id);
+}
+
+function resumeDraft(schoolName) {
+  // ค้นหา school จากชื่อแล้วเปิด
+  const s = SCHOOLS.find(x => x.name === schoolName || x.id === schoolName);
+  if (s) pickSchool(s.id);
+  else startInspection();
 }
 
 async function loadSchool(id) {
