@@ -2,6 +2,7 @@
 // แท็บการนิเทศ 7 แท็บ (ตามเครื่องมือ/ส่วนของคู่มือ) + บันทึกผล + ประวัติ + สถิติ
 // ============================================================
 let STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
+let EDIT_ROW = null;
 
 function sumSc(prefix) {
   let s = 0;
@@ -89,6 +90,21 @@ function updateScoreBar() {
   bar.innerHTML = `<span class="chip" style="background:${getColor(pct)}">ส่วนที่ 1: ${s1}/44 (${pct}%) — ${lv}</span>`;
 }
 
+// โยน STATE กลับเป็น DOM: ปุ่มคะแนน scsel + textarea note (ใช้ตอน buildAll/switchTab/loadHistory)
+function applyAnswersToDom(scope) {
+  const root = scope || document;
+  for (const [k, v] of Object.entries(STATE.answers)) {
+    const target = v === null ? 'N/A' : String(v);
+    root.querySelectorAll(`button.sc[data-key="${k}"]`).forEach(b => {
+      b.classList.toggle('scsel', b.dataset.sc === target);
+    });
+  }
+  for (const [k, v] of Object.entries(STATE.notes)) {
+    const ta = root.querySelector(`textarea[data-key="${k}"]`);
+    if (ta) ta.value = v;
+  }
+}
+
 // ข้อมูลโรงเรียนเสมอสำหรับทุกรอบ
 function schoolMetaHeader() {
   return `<div class="meta-box">
@@ -145,9 +161,11 @@ function buildTab1() {
 // ============================================================
 function buildTab2() {
   const root = el('tab-2');
+  const f = (SCHOOLS.find(x => x.id === SELECTED.id) || {}).form || '';
+  const isReligious = f !== 'แบบสอนสามัญ';
   root.innerHTML = `<div class="panel-head"><h2>🏛️ ส่วนที่ 1 ประเด็นกลาง (ข้อ 1-22) — ทุกสถานศึกษา</h2>
     <div class="hint">ให้คะแนน: <b>2</b>=ทำได้ชัดเจน <b>1</b>=กำลังพัฒนา <b>0</b>=ต้องได้รับการช่วยเหลือ <b>N/A</b>=ไม่เกี่ยวข้อง</div></div>
-  <div class="form-wrap">${part1ItemsHtml()}</div>`;
+  <div class="form-wrap">${part1ItemsHtml()}${isReligious ? '<div class="sep"></div><div class="grp-h">ส่วนที่ 2 เพิ่มเติม (สามัญควบคู่ศาสนาอิสลาม — ข้อ 23-30)</div>' + part2ItemsHtml() : ''}</div>`;
   bindPanelEvents(root);
 }
 
@@ -314,12 +332,14 @@ function switchTab(id) {
   ['tab-1','tab-2','tab-3','tab-4','tab-5','tab-6','tab-7','tab-files','tab-hist','tab-stats','tab-users','tab-info'].forEach(t =>
     $(`#${t}`).classList.toggle('active', t === id));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.target === id));
+  applyAnswersToDom($(`#${id}`));
   sidebarTouched = true;
 }
 function buildAll() {
   buildTab1(); buildTab2(); buildTab3(); buildTab4(); buildTab5(); buildTab6(); buildTab7();
   if (SELECTED) { initPinBar(); }
   updateScoreBar();
+  applyAnswersToDom();
 }
 
 // ============================================================
@@ -377,7 +397,7 @@ function collectResult() {
     notes: { support_etc, develop: (document.querySelector('[data-key=develop]')||{}).value || '' , ...STATE.notes },
     basic: { ...basic, ...t },
     strengths, develop: (document.querySelector('[data-key=develop]')||{}).value || '',
-    support, agreements,
+    support, agreements, fiveQ,
     basicData,
     s1, s2, s3, s4, totalScore: s1, pct, level,
     avgS1: s1
@@ -400,10 +420,11 @@ async function saveResult(editRow) {
     toast("ยังไม่มีการให้คะแนนหรือบันทึกข้อมูล — หากต้องการบันทึก โปรดให้คะแนนอย่างน้อย 1 ข้อ", false);
     return;
   }
-  const res = await post('saveSchoolEvaluation', { ...payload, supervisor: CURRENT_USER ? (CURRENT_USER.fname + ' (' + CURRENT_USER.username + ')') : '', editRow: editRow || null });
+  const res = await post('saveSchoolEvaluation', { ...payload, supervisor: CURRENT_USER ? (CURRENT_USER.fname + ' (' + CURRENT_USER.username + ')') : '', editRow: editRow || EDIT_ROW || null });
   if (res && res.success) {
     toast(res.message || 'บันทึกเรียบร้อยแล้ว', true);
     clearDraft();
+    EDIT_ROW = null;
     if (SELECTED) SELECTED = { ...SELECTED, ...payload.schoolData };
     showEvalHistory();
   } else {
@@ -425,15 +446,16 @@ async function aiDraftAgreement() {
     "\n\nจงร่างตารางข้อตกลงเพื่อการพัฒนา (Agreement) ไม่เกิน 3 แถว โดยแต่ละแถวประกอบด้วย: ประเด็นที่จะพัฒนา, สิ่งที่จะดำเนินการ, ผู้รับผิดชอบ, ผู้สนับสนุน, หลักฐานที่จะดูครั้งต่อไป, กำหนดติดตาม — ตอบเป็น JSON array เช่น [{\"agree_1\":\"...\",\"agree_2\":\"...\",\"agree_3\":\"...\",\"agree_4\":\"...\",\"agree_5\":\"...\",\"agree_6\":\"...\"}]";
   toast("กำลังประมวลผลด้วย AI ...", false);
   const r = await post('chat', prompt);
+  const replyText = (r && r.reply) || '';
   try {
-    const data = JSON.parse(r.reply.replace(/```json|```/g, '').trim());
+    const data = JSON.parse(replyText.replace(/```json|```/g, '').trim());
     if (Array.isArray(data)) {
       document.querySelectorAll('#agreeTb tbody tr').forEach(tr => tr.remove());
       data.forEach(row => addAgreeRow(row));
       toast("AI ร่างข้อตกลง เรียบร้อย — ตรวจทานและแก้ไขก่อนบันทึก", true);
     }
   } catch (e) {
-    toast("AI ตอบไม่สามารถแปลงเป็นตารางได้: " + r.reply.slice(0, 80), false);
+    toast("AI ตอบไม่สามารถแปลงเป็นตารางได้: " + (replyText.slice(0, 80) || (r && r.message) || 'ติดต่อ AI ไม่สำเร็จ'), false);
   }
 }
 
@@ -543,9 +565,92 @@ async function deleteEvalRow(row) {
   else toast((r && r.message) || "ลบไม่สำเร็จ", false);
 }
 
-function loadHistoryRow(row) {
-  // โหลดข้อมูลแล้วดึงเข้าฟอร์ม (อยู่ใน DATA — backend อ่าน fields แยก): refresh แบบง่าย
-  toast("จะเปิดรายละเอียดผ่านการแก้ไขโดยตรง (รองรับในปุ่ม 'เปิดข้อมูล')", false);
+async function loadHistoryRow(row) {
+  if (!SELECTED) return;
+  toast('กำลังโหลดรายละเอียด...', false);
+  const r = await post('getSchoolEvaluations', SELECTED.id);
+  if (!r || !r.success) { toast((r||{}).message || 'โหลดไม่สำเร็จ', false); return; }
+  const rec = (r.data || []).find(x => Number(x.row) === Number(row));
+  if (!rec) { toast('ไม่พบรายการนี้แล้ว', false); return; }
+  const d = rec.details || {};
+  STATE = {
+    answers: d.answers || {},
+    notes: d.notes || {},
+    multibasic: d.multibasic || {},
+    multiVals: d.multiVals || {},
+    basic: d.basic || {},
+    evalMeta: { formType: d.formType || 'รอบที่ 1 (ภาคเรียนที่ 1)', round: d.round || '' }
+  };
+  EDIT_ROW = Number(row);
+  buildAll();
+  // คืนค่า radios/checkbox อื่น ๆ ที่ buildTab ไม่ได้ render จาก STATE
+  const ft = STATE.evalMeta.formType;
+  if (ft) {
+    document.querySelectorAll(`input[name=formType][value="${esc(ft)}"]`).forEach(x => x.checked = true);
+  }
+  // ค่าพื้นฐาน (kv-v) ที่เก็บใน STATE.basic ผ่าน dataset.key
+  document.querySelectorAll('label.keyval').forEach(lb => {
+    const dk = lb.dataset.key;
+    if (dk && STATE.basic[dk] !== undefined && STATE.basic[dk] !== null) {
+      const inp = lb.querySelector('.kv-v');
+      if (inp) inp.value = STATE.basic[dk];
+    }
+  });
+  // ลงชื่อ/วันที่
+  ['sigAdmin','sigLead','sigRecord','sigDate','evalDate'].forEach(k => {
+    if (STATE.basic[k]) {
+      const inp = document.querySelector(`label[data-key="${k}"] .kv-v`);
+      if (inp) inp.value = STATE.basic[k];
+    }
+  });
+  // สถานะการพัฒนา (statusDev) radio
+  const sd = (d.followUp && d.followUp.statusDev) || '';
+  if (sd) {
+    const rb = document.querySelector(`input[name=statusDev][value="${esc(sd)}"]`);
+    if (rb) rb.checked = true;
+  }
+  // followUp f1-f3/fStatus
+  const fu = d.followUp || {};
+  ['f1','f2','f3','fStatus'].forEach(k => {
+    if (fu[k]) {
+      const inp = document.querySelector(`label[data-key="${k}"] .kv-v`);
+      if (inp) inp.value = fu[k];
+    }
+  });
+  // 5 คำถาม (sum:1-5)
+  for (let i = 1; i <= 5; i++) {
+    const v = (d.fiveQ && d.fiveQ[i]) || '';
+    if (v) {
+      const ta = document.querySelector(`[data-key="sum:${i}"]`);
+      if (ta) ta.value = v;
+    }
+  }
+  // จุดแข็ง / ประเด็นพัฒนา / สนับสนุน
+  (d.strengths || []).forEach((s, i) => {
+    const inp = document.querySelector(`input.strength-inp[data-i="${i+1}"]`);
+    if (inp) inp.value = s;
+  });
+  if (d.develop) {
+    const dv = document.querySelector('[data-key=develop]');
+    if (dv) dv.value = d.develop;
+  }
+  if (d.support && d.support.length) {
+    d.support.forEach(v => {
+      const cb = document.querySelector(`.supchk input[value="${esc(v)}"]`);
+      if (cb) cb.checked = true;
+    });
+  }
+  // ข้อตกลง (agreements) — ลบแถวเปล่าที่ buildTab6 สร้าง แล้วเพิ่มแถวจากข้อมูล
+  const tbody = document.querySelector('#agreeTb tbody');
+  if (tbody) {
+    tbody.querySelectorAll('tr').forEach(tr => tr.remove());
+    (d.agreements || []).forEach(row => addAgreeRow(row || {}));
+    if (!(d.agreements || []).length) addAgreeRow({});
+  }
+  switchTab('tab-1');
+  updateScoreBar();
+  applyAnswersToDom();
+  toast('โหลดผลการนิเทศครั้งนี้เข้าฟอร์มแล้ว — แก้ไขแล้วกด "บันทึกผลการนิเทศ" เพื่ออัปเดต', true);
 }
 
 // ============================================================

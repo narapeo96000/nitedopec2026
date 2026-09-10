@@ -218,19 +218,17 @@ function restoreDraftIfAny() {
   const draft = loadDraft(SELECTED.id);
   if (!draft || !draft.state) return;
   if (!confirm('พบข้อมูลร่างล่าสุดจาก ' + new Date(draft.timestamp).toLocaleString('th') + '\nต้องการกู้คืนข้อมูลหรือไม่?')) { clearDraft(); return; }
-  STATE = draft.state;
-  document.querySelectorAll('button.sc[data-key]').forEach(btn => {
-    const key = btn.dataset.key;
-    if (STATE.answers[key] !== undefined) {
-      const v = STATE.answers[key];
-      if (v === null) { btn.classList.add('scsel'); }
-      else if (Number(btn.dataset.sc) === v) { btn.classList.add('scsel'); }
-    }
-  });
-  document.querySelectorAll('textarea.note[data-key]').forEach(ta => {
-    const key = ta.dataset.key;
-    if (STATE.notes[key]) ta.value = STATE.notes[key];
-  });
+  const s = draft.state;
+  STATE.answers = s.answers || {};
+  STATE.notes = s.notes || {};
+  STATE.multibasic = s.multibasic || {};
+  STATE.multiVals = s.multiVals || {};
+  STATE.basic = s.basic || {};
+  STATE.evalMeta = { formType: (s.evalMeta && s.evalMeta.formType) || ROUNDS[0].v, round: (s.evalMeta && s.evalMeta.round) || '' };
+  const ft = STATE.evalMeta.formType;
+  document.querySelectorAll(`input[name=formType][value="${esc(ft)}"]`).forEach(x => x.checked = true);
+  applyAnswersToDom();
+  updateScoreBar();
   toast('กู้คืนข้อมูลร่างเรียบร้อย', true);
 }
 
@@ -567,7 +565,7 @@ async function doRegister(e) {
 
 function logout() {
   CURRENT_USER = null;
-  SCHOOLS = []; SELECTED = null; STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {} };
+  SCHOOLS = []; SELECTED = null; STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
   if (AUTO_SAVE_INTERVAL) clearInterval(AUTO_SAVE_INTERVAL);
   localStorage.removeItem(REMEMBER_KEY);
   clearDraft();
@@ -740,24 +738,9 @@ async function startDashWithSchool(schoolId) {
 // Dashboard หน้าแรก (แสดงหลังเข้าสู่ระบบ)
 // ============================================================
 async function showDashboard() {
-  // โหลดสถิติ
-  const stats = await post('getStatsSchool');
-  const d = (stats && stats.success) ? stats.data : { totalSchools: 0, totalEval: 0, totalUsers: 0, staff: 0, students: 0, avgPct: 0, levelCounts: {}, latest: [] };
-
-  // ดึงข้อมูลร่างล่าสุด
-  let draftInfo = null;
-  try {
-    const raw = localStorage.getItem(AUTO_SAVE_KEY);
-    if (raw) {
-      const draft = JSON.parse(raw);
-      if (draft.schoolId && draft.timestamp) {
-        const school = SCHOOLS.find(s => s.id === draft.schoolId);
-        draftInfo = { school: school ? school.name : draft.schoolId, time: new Date(draft.timestamp).toLocaleString('th') };
-      }
-    }
-  } catch(e) {}
-
   const root = el('tab-1');
+  // render ทั้งหน้าแบบ sync (ไม่รอ network) เพื่อกัน race กับ startInspection/loadSchool
+  // ตัวเลขสถิติใช้ id เติมทีหลังใน dashFillStats()
   root.innerHTML = `
     <div class="dash-hero">
       <div class="dash-hero-text">
@@ -771,32 +754,27 @@ async function showDashboard() {
       </button>
     </div>
 
-    ${draftInfo ? `
-    <div class="dash-draft" onclick="resumeDraft('${esc(draftInfo.school)}')">
-      <span>📝</span>
-      <div><b>พบข้อมูลร่างล่าสุด</b><small>${esc(draftInfo.school)} · ${draftInfo.time}</small></div>
-      <span class="btn btn-mini">กู้คืน →</span>
-    </div>` : ''}
+    <div class="dash-draft" id="dashDraft"></div>
 
     <div class="dash-stats">
       <div class="dash-stat-card" onclick="startInspection()">
         <div class="dash-stat-icon">🏫</div>
-        <div class="dash-stat-num">${d.totalSchools}</div>
+        <div class="dash-stat-num" id="ds_schools">…</div>
         <div class="dash-stat-label">สถานศึกษาทั้งหมด</div>
       </div>
       <div class="dash-stat-card" onclick="showEvalHistory()">
         <div class="dash-stat-icon">📋</div>
-        <div class="dash-stat-num">${d.totalEval}</div>
+        <div class="dash-stat-num" id="ds_evals">…</div>
         <div class="dash-stat-label">ครั้งที่นิเทศแล้ว</div>
       </div>
       <div class="dash-stat-card">
         <div class="dash-stat-icon">👨‍🏫</div>
-        <div class="dash-stat-num">${d.staff}</div>
+        <div class="dash-stat-num" id="ds_staff">…</div>
         <div class="dash-stat-label">ครู/บุคลากร</div>
       </div>
       <div class="dash-stat-card">
         <div class="dash-stat-icon">🎓</div>
-        <div class="dash-stat-num">${d.students}</div>
+        <div class="dash-stat-num" id="ds_students">…</div>
         <div class="dash-stat-label">นักเรียน</div>
       </div>
     </div>
@@ -804,32 +782,22 @@ async function showDashboard() {
     <div class="dash-section">
       <h3>📊 สถิติการนิเทศ</h3>
       <div class="dash-levels">
-        <div class="dash-level-item"><span class="dl-dot" style="background:#0f766e"></span>ดีมาก (≥80%) <b>${d.levelCounts['ดีมาก'] || 0}</b></div>
-        <div class="dash-level-item"><span class="dl-dot" style="background:#2563eb"></span>ดี (60-79%) <b>${d.levelCounts['ดี'] || 0}</b></div>
-        <div class="dash-level-item"><span class="dl-dot" style="background:#d97706"></span>พอใช้ (40-59%) <b>${d.levelCounts['พอใช้'] || 0}</b></div>
-        <div class="dash-level-item"><span class="dl-dot" style="background:#dc2626"></span>ต้องปรับปรุง (<40%) <b>${d.levelCounts['ต้องปรับปรุง'] || 0}</b></div>
+        <div class="dash-level-item"><span class="dl-dot" style="background:#0f766e"></span>ดีมาก (≥80%) <b id="ds_l_good">…</b></div>
+        <div class="dash-level-item"><span class="dl-dot" style="background:#2563eb"></span>ดี (60-79%) <b id="ds_l_fine">…</b></div>
+        <div class="dash-level-item"><span class="dl-dot" style="background:#d97706"></span>พอใช้ (40-59%) <b id="ds_l_ok">…</b></div>
+        <div class="dash-level-item"><span class="dl-dot" style="background:#dc2626"></span>ต้องปรับปรุง (<40%) <b id="ds_l_bad">…</b></div>
       </div>
-      <div class="dash-avg">ค่าเฉลี่ยร้อยละ: <b style="color:${getColor(d.avgPct)}">${d.avgPct}%</b></div>
+      <div class="dash-avg">ค่าเฉลี่ยร้อยละ: <b id="ds_avg" style="color:#64748b">…</b></div>
     </div>
 
     <div class="dash-section">
       <h3>📜 การนิเทศล่าสุด</h3>
-      ${d.latest.length ? d.latest.slice(0, 5).map(v => `
-        <div class="dash-recent">
-          <div class="dash-recent-info">
-            <b>${esc(v.name)}</b>
-            <small>${esc(v.form || '')} · ${esc(v.timestamp)}</small>
-          </div>
-          <div class="dash-recent-score">
-            <span class="chip" style="background:${getColor(v.pct)};font-size:12px">${v.pct}% ${esc(v.level)}</span>
-          </div>
-        </div>
-      `).join('') : '<div class="empty">ยังไม่มีประวัติการนิเทศ</div>'}
+      <div id="ds_recent"><div class="empty">กำลังโหลด...</div></div>
     </div>
 
     <div class="dash-section">
-      <h3>🏫 รายชื่อสถานศึกษา (${SCHOOLS.length} แห่ง)</h3>
-      <div class="dash-school-list">
+      <h3>🏫 รายชื่อสถานศึกษา (<span id="ds_scnt">${SCHOOLS.length}</span> แห่ง)</h3>
+      <div class="dash-school-list" id="ds_schoolsList">
         ${SCHOOLS.slice(0, 10).map(s => `
           <div class="dash-school-item" onclick="startInspectionSchool('${esc(s.id)}')">
             <div class="dash-school-info">
@@ -843,6 +811,48 @@ async function showDashboard() {
       </div>
     </div>
   `;
+  // ข้อมูลร่างล่าสุด (จาก localStorage ไม่ต้องรอ network)
+  try {
+    const raw = localStorage.getItem(AUTO_SAVE_KEY);
+    if (raw) {
+      const draft = JSON.parse(raw);
+      if (draft.schoolId && draft.timestamp) {
+        const school = SCHOOLS.find(s => s.id === draft.schoolId);
+        $('#dashDraft').innerHTML = `
+          <span>📝</span>
+          <div><b>พบข้อมูลร่างล่าสุด</b><small>${esc(school ? school.name : draft.schoolId)} · ${new Date(draft.timestamp).toLocaleString('th')}</small></div>
+          <span class="btn btn-mini">กู้คืน →</span>`;
+        $('#dashDraft').onclick = () => resumeDraft(draft.schoolId);
+      }
+    }
+  } catch(e) {}
+  // โหลดสถิติจริงแล้วเติมตัวเลข (เฉพาะ id ที่มี — ถ้า race ทับไปแล้วก็ข้าม)
+  const stats = await post('getStatsSchool');
+  const d = (stats && stats.success) ? stats.data : null;
+  if (!d) return;
+  const put = (id, val) => { const e = el(id); if (e) e.textContent = val; };
+  put('ds_schools', d.totalSchools);
+  put('ds_evals', d.totalEval);
+  put('ds_staff', d.staff);
+  put('ds_students', d.students);
+  put('ds_l_good', d.levelCounts['ดีมาก'] || 0);
+  put('ds_l_fine', d.levelCounts['ดี'] || 0);
+  put('ds_l_ok', d.levelCounts['พอใช้'] || 0);
+  put('ds_l_bad', d.levelCounts['ต้องปรับปรุง'] || 0);
+  const avg = $('#ds_avg'); if (avg) { avg.textContent = d.avgPct + '%'; avg.style.color = getColor(d.avgPct); }
+  const rc = $('#ds_recent');
+  if (rc && d.latest && d.latest.length) {
+    rc.innerHTML = d.latest.slice(0, 5).map(v => `
+      <div class="dash-recent">
+        <div class="dash-recent-info">
+          <b>${esc(v.name)}</b>
+          <small>${esc(v.form || '')} · ${esc(v.timestamp)}</small>
+        </div>
+        <div class="dash-recent-score">
+          <span class="chip" style="background:${getColor(v.pct)};font-size:12px">${v.pct}% ${esc(v.level)}</span>
+        </div>
+      </div>`).join('');
+  } else if (rc) { rc.innerHTML = '<div class="empty">ยังไม่มีประวัติการนิเทศ</div>'; }
 }
 
 // ============================================================
@@ -900,7 +910,7 @@ async function loadSchool(id) {
   if (!r || !r.success) { toast((r||{}).message || 'โหลดข้อมูลไม่สำเร็จ', false); return; }
   SELECTED = r.data;
   SCHOOLS = SCHOOLS.map(s => s.id === SELECTED.id ? { ...s, ...r.data } : s);
-  STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {} };
+  STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
   buildAll();
   switchTab('tab-1');
   startAutoSave();
