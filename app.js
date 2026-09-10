@@ -346,6 +346,7 @@ function showLogin() {
   <div id="toast" class="toast"></div>`;
   restoreSavedLogin();
   loadLoginData();
+  initLoginSuggestClose();
 }
 
 let LOGIN_SCHOOLS = [];
@@ -353,6 +354,20 @@ function numbered(n) { const v = Number(n) || 0; return v ? v.toLocaleString() :
 function levelCls(l) { return ({ 'ดีมาก': 'lv-green', 'ดี': 'lv-blue', 'พอใช้': 'lv-amber' })[l] || 'lv-red'; }
 function hideLoginSuggest() { const b = $('#lgSchoolSuggest'); if (b) b.classList.add('d-none'); }
 function loginSchoolKey(e) { if (e.key === 'Escape') hideLoginSuggest(); }
+function initLoginSuggestClose() {
+  document.addEventListener('click', function(e) {
+    const box = $('#lgSchoolSuggest');
+    const inp = $('#lgSchoolSearch');
+    if (box && !box.classList.contains('d-none') && inp && !box.contains(e.target) && e.target !== inp) {
+      hideLoginSuggest();
+    }
+  });
+  const inp = $('#lgSchoolSearch');
+  if (inp) {
+    inp.addEventListener('blur', function() { setTimeout(hideLoginSuggest, 200); });
+    inp.addEventListener('focus', function() { if (this.value.trim()) loginSchoolFilter(this.value); });
+  }
+}
 function loginSchoolFilter(q) {
   const kw = (q || '').toLowerCase().trim();
   const list = LOGIN_SCHOOLS.filter(s =>
