@@ -403,7 +403,7 @@ function collectResult() {
     avgS1: s1
   };
   evalData.followUp = {
-    f1: basic.f1, f2: basic.f2, f3: basic.f3, f4: basic.f4, fStatus: basic.fStatus || '',
+    f1: basic.f1, f2: basic.f2, f3: basic.f3, fStatus: basic.fStatus || '',
     statusDev: (document.querySelector('input[name=statusDev]:checked') || {}).value || ''
   };
   evalData.sigAdmin = basic.sigAdmin || '';
@@ -519,8 +519,9 @@ async function doUpload() {
 }
 
 async function deleteUpload(id) {
+  if (!SELECTED || !SELECTED.id) return;
   if (!confirm('ยืนยันลบไฟล์นี้?')) return;
-  const r = await post('deleteUpload', { id, username: CURRENT_USER ? CURRENT_USER.username : '' });
+  const r = await post('deleteUpload', { id, username: CURRENT_USER ? CURRENT_USER.username : '', schoolId: SELECTED.id });
   if (r && r.success) { toast(r.message, true); refreshFiles(); }
   else toast((r || {}).message || 'ลบไม่สำเร็จ', false);
 }

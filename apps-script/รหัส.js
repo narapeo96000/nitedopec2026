@@ -591,15 +591,33 @@ function deleteUpload(payload) {
   const p = (typeof payload === 'object' && payload !== null) ? payload : {};
   const fileId = String(p.id || '').trim();
   const username = String(p.username || '').trim();
+  const schoolId = String(p.schoolId || '').trim();
   if (!fileId || !username) return { success: false, message: 'ข้อมูลไม่ครบถ้วน' };
   const users = ensureUsersSheet().getDataRange().getValues();
   let ok = false;
+  let userSchool = '';
+  let isAdmin = false;
   for (let i = 1; i < users.length; i++) {
-    if (String(users[i][0]).trim() === username && ["ผู้ใช้", "ผู้ดูแลระบบ"].indexOf(String(users[i][5] || '').trim()) >= 0) { ok = true; break; }
+    if (String(users[i][0]).trim() === username) {
+      userSchool = String(users[i][4] || '').trim();
+      isAdmin = String(users[i][5] || '').trim() === 'ผู้ดูแลระบบ';
+      if (["ผู้ใช้", "ผู้ดูแลระบบ"].indexOf(String(users[i][5] || '').trim()) >= 0) ok = true;
+      break;
+    }
   }
   if (!ok) return { success: false, message: 'ไม่มีสิทธิ์ใช้งาน' };
+  // Ownership check: ไฟล์ต้องอยู่ในโฟลเดอร์โรงเรียนที่ user สังกัด (admin ดูได้ทุกโรงเรียน)
   try {
     const f = DriveApp.getFileById(fileId);
+    const parents = f.getParents();
+    let fileSchool = '';
+    while (parents.hasNext()) {
+      const folder = parents.next();
+      if (folder.getId() !== DRIVE_FOLDER_ID) { fileSchool = folder.getName(); break; }
+    }
+    if (!isAdmin && fileSchool && fileSchool !== userSchool) {
+      return { success: false, message: 'ไม่มีสิทธิ์ลบไฟล์ของโรงเรียนอื่น' };
+    }
     f.setTrashed(true);
     return { success: true, message: 'ลบไฟล์เรียบร้อยแล้ว' };
   } catch (e) {

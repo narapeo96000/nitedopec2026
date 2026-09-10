@@ -455,7 +455,7 @@ async function loadLoginData() {
 function restoreSavedLogin() {
   try {
     const s = JSON.parse(localStorage.getItem(REMEMBER_KEY) || 'null');
-    if (s && s.u) { $('#username').value = s.u; $('#password').value = s.p || ''; $('#rememberPass').checked = true; }
+    if (s && s.u) { $('#username').value = s.u; try { $('#password').value = s.p ? decodeURIComponent(escape(atob(s.p))) : ''; } catch(e) { $('#password').value = ''; } $('#rememberPass').checked = true; }
   } catch (e) {}
 }
 
@@ -521,7 +521,7 @@ async function doLogin(e) {
   if (r && r.success) {
     CURRENT_USER = r.userData;
     if ($('#rememberPass') && $('#rememberPass').checked) {
-      localStorage.setItem(REMEMBER_KEY, JSON.stringify({ u, p }));
+      localStorage.setItem(REMEMBER_KEY, JSON.stringify({ u, p: btoa(unescape(encodeURIComponent(p))) }));
     } else {
       localStorage.removeItem(REMEMBER_KEY);
     }
