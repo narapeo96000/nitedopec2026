@@ -1,6 +1,14 @@
 const SHEET_ID = '1qk9eLhwKgPvh2fLwWNSthV4JKyDkJGqJojhLDus5460';
 // โฟลเดอร์ Drive สำหรับเก็บไฟล์หลักฐานการนิเทศ (opec-uploads)
 const DRIVE_FOLDER_ID = '1R__WEisrqbmLu3OKsRbih_yqBX_s_09O';
+// แปลงค่ารูปแบบจริงจากคอลัมน์ G → ค่าภายใน
+function normalizeForm(v) {
+  const s = String(v || '').trim();
+  if (s.includes('อิสลามควบคู่สามัญ')) return 'แบบสอนสามัญควบคู่ศาสนาอิสลาม';
+  if (s.includes('สามัญศึกษา')) return 'แบบสอนสามัญ';
+  if (s.includes('การศึกษาสงเคราะห์')) return 'การศึกษาสงเคราะห์';
+  return s || '';
+}
 // ============================================================
 // ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส
 // ใช้ชีต ADDR_SCHOOL + DATA_SCHOOL + USERS (USERS ร่วมกับระบบอื่น ภายใน Spreadsheet เดียวกัน)
@@ -308,7 +316,7 @@ function getSchoolList() {
       dist: String(rows[i][3] || ''),
       subdist: String(rows[i][4] || ''),
       phone: String(rows[i][5] || ''),
-      form: String(rows[i][6] || ''),
+      form: normalizeForm(rows[i][6]),
       admin: String(rows[i][7] || ''),
       staff: String(rows[i][8] || ''),
       students: String(rows[i][9] || ''),
@@ -335,7 +343,7 @@ function getSchoolData(id) {
               row: i + 6,
               id: rows[i][0], name: rows[i][1], address: rows[i][2],
               dist: rows[i][3], subdist: rows[i][4], phone: rows[i][5],
-              form: String(rows[i][6] || ''),
+              form: normalizeForm(rows[i][6]),
               admin: rows[i][7], staff: rows[i][8], students: rows[i][9],
               coords: String(rows[i][10] || '')
             }
@@ -462,7 +470,7 @@ function getStatsSchool() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   let totalSchools = 0, totalEval = 0, sumPct = 0, sumPctN = 0;
   let staff = 0, students = 0;
-  const typeCount = { 'แบบสอนสามัญ': 0, 'แบบสอนสามัญควบคู่ศาสนาอิสลาม': 0 };
+  const typeCount = { 'แบบสอนสามัญ': 0, 'แบบสอนสามัญควบคู่ศาสนาอิสลาม': 0, 'การศึกษาสงเคราะห์': 0 };
   const levelCounts = { 'ดีมาก': 0, 'ดี': 0, 'พอใช้': 0, 'ต้องปรับปรุง': 0 };
   const latest = [];
 
@@ -476,8 +484,8 @@ function getStatsSchool() {
         totalSchools++;
         staff += Number(vals[i][8]) || 0;
         students += Number(vals[i][9]) || 0;
-        const f = String(vals[i][6] || '').trim();
-        if(typeCount[f] !== undefined) typeCount[f]++;
+        const f = normalizeForm(vals[i][6]);
+        if(f) typeCount[f] = (typeCount[f] || 0) + 1;
       }
     }
   }
