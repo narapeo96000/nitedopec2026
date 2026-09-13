@@ -5,8 +5,8 @@ const DRIVE_FOLDER_ID = '1R__WEisrqbmLu3OKsRbih_yqBX_s_09O';
 function normalizeForm(v) {
   const s = String(v || '').trim();
   if (s.includes('อิสลามควบคู่สามัญ')) return 'แบบสอนสามัญควบคู่ศาสนาอิสลาม';
-  if (s.includes('สามัญศึกษา')) return 'แบบสอนสามัญ';
   if (s.includes('การศึกษาสงเคราะห์')) return 'การศึกษาสงเคราะห์';
+  if (s.includes('สามัญศึกษา')) return 'แบบสอนสามัญ';
   return s || '';
 }
 // ============================================================
