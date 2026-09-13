@@ -676,6 +676,7 @@ async function showStatsPanel() {
       <div class="stat-card"><b>${d.students}</b><span>นักเรียนรวม</span></div>
       <div class="stat-card"><b>${d.typeCount['แบบสอนสามัญ'] || 0}</b><span>แบบสามัญ</span></div>
       <div class="stat-card"><b>${d.typeCount['แบบสอนสามัญควบคู่ศาสนาอิสลาม'] || 0}</b><span>สามัญควบคู่ศาสนา</span></div>
+      <div class="stat-card"><b>${d.typeCount['การศึกษาสงเคราะห์'] || 0}</b><span>การศึกษาสงเคราะห์</span></div>
     </div>
     <div class="hist-list">` +
     (d.latest.length ? d.latest.map(v => `<div class="hist-card"><b>${esc(v.name)}</b> · ${esc(v.form)} · ส่วนที่1 ${v.pct}% (${esc(v.level)}) · ${esc(v.timestamp)}</div>`).join('') : `<div class="empty">ยังไม่มีข้อมูลการนิเทศ</div>`) +

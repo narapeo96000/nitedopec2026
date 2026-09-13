@@ -308,8 +308,9 @@ function showLogin() {
         <div class="card-title"><h4>📊 สถิติระบบนิเทศออนไลน์</h4><span class="badge">อัปเดตอัตโนมัติ</span></div>
         <div class="stat-grid">
           <div class="stat-card"><div class="lbl">🏫 สถานศึกษา</div><div class="val" id="st_schools">—</div></div>
-          <div class="stat-card"><div class="lbl">📚 แบบสอนสามัญ</div><div class="val" id="st_common">—</div></div>
+           <div class="stat-card"><div class="lbl">📚 แบบสอนสามัญ</div><div class="val" id="st_common">—</div></div>
           <div class="stat-card"><div class="lbl">🕌 สามัญควบคู่ศาสนา</div><div class="val" id="st_commonRel">—</div></div>
+          <div class="stat-card"><div class="lbl">🤲 การศึกษาสงเคราะห์</div><div class="val" id="st_welfare">—</div></div>
           <div class="stat-card"><div class="lbl">📝 ครั้งที่นิเทศ</div><div class="val" id="st_eval">—</div></div>
           <div class="stat-card"><div class="lbl">👨‍🏫 ครู/บุคลากร</div><div class="val" id="st_staff">—</div></div>
           <div class="stat-card"><div class="lbl">🎒 นักเรียน</div><div class="val" id="st_students">—</div></div>
@@ -426,6 +427,7 @@ async function loadLoginData() {
     set('st_schools', numbered(d.totalSchools));
     set('st_common', numbered(d.typeCount && d.typeCount['แบบสอนสามัญ']));
     set('st_commonRel', numbered(d.typeCount && d.typeCount['แบบสอนสามัญควบคู่ศาสนาอิสลาม']));
+    set('st_welfare', numbered(d.typeCount && d.typeCount['การศึกษาสงเคราะห์']));
     set('st_eval', numbered(d.totalEval));
     set('st_staff', numbered(d.staff));
     set('st_students', numbered(d.students));
