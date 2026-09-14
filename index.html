@@ -209,6 +209,14 @@ textarea.note{width:100%;resize:vertical}
 .agree-tb input{width:100%;border:1px solid transparent;background:transparent;padding:4px}
 .agree-tb input:focus{background:#fff;border:1px solid var(--bord);outline:none}
 .toolbar{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.doc-list{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.doc-item{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#f0fdfa;border:1px solid #d5e5e0;border-radius:12px;text-decoration:none;color:#0f172a;transition:.15s}
+.doc-item:hover{border-color:#0f766e;box-shadow:0 4px 12px rgba(0,0,0,.08);transform:translateY(-1px)}
+.doc-icon{font-size:1.6rem;flex-shrink:0}
+.doc-text{flex:1;font-size:.92rem;line-height:1.5}
+.doc-text b{color:#065f46}
+.doc-text small{color:#64748b}
+.doc-dl{background:#0f766e;color:#fff;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600;white-space:nowrap;flex-shrink:0}
 .status-row{display:flex;gap:14px;flex-wrap:wrap}
 .rstatus{display:flex;gap:6px;align-items:center;font-size:14px}
 .q{margin:10px 0}
@@ -352,6 +360,9 @@ textarea.note{width:100%;resize:vertical}
   .landing .form-control{background:#0f172a;color:#e2e8f0;border-color:#475569}
   .landing .suggest-box{background:#1e293b;border-color:#334155}
   .landing .suggest-item{background:#1e293b;color:#e2e8f0;border-color:#334155}
+  .landing .doc-item{background:#1e293b;border-color:#334155;color:#e2e8f0}
+  .landing .doc-item:hover{border-color:#14b8a6}
+  .landing .doc-text b{color:#5eead4}
   .landing .suggest-item:hover,.landing .suggest-item.active{background:#134e4a}
   .landing .oppts{color:#e2e8f0}
   .landing th,.landing td{border-color:#334155}

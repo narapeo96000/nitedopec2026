@@ -336,6 +336,27 @@ function showLogin() {
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-title"><h4>📄 เอกสารดาวน์โหลด</h4><span class="badge">แผนนิเทศ</span></div>
+        <div class="doc-list">
+          <a class="doc-item" href="https://docs.google.com/document/d/140PRrImcq3b0-jAIsFTAUGJMGB5IMHBd/export?format=pdf" target="_blank">
+            <span class="doc-icon">📋</span>
+            <span class="doc-text"><b>แผนนิเทศ ติดตาม และประเมินผลการใช้หลักสูตรตาดีกา</b><br><small>ศูนย์การศึกษาอิสลามประจำมัสยิด จังหวัดนราธิวาส</small></span>
+            <span class="doc-dl">⬇ PDF</span>
+          </a>
+          <a class="doc-item" href="https://docs.google.com/document/d/1gb7mw8ZT6-PCLeSSzsTfcmTqfhoyv5wj/export?format=pdf" target="_blank">
+            <span class="doc-icon">📋</span>
+            <span class="doc-text"><b>แผนนิเทศ ติดตาม และพัฒนาการนำหลักสูตรไปใช้</b><br><small>สถาบันศึกษาปอเนาะ จังหวัดนราธิวาส</small></span>
+            <span class="doc-dl">⬇ PDF</span>
+          </a>
+          <a class="doc-item" href="https://docs.google.com/document/d/1hGeK46od6-DQ5SK8JsUvB6j5nklKU5xS/export?format=pdf" target="_blank">
+            <span class="doc-icon">📋</span>
+            <span class="doc-text"><b>แผนนิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียน</b><br><small>โรงเรียนเอกชนในระบบ จังหวัดนราธิวาส</small></span>
+            <span class="doc-dl">⬇ PDF</span>
+          </a>
+        </div>
+      </div>
+
       <div class="app-footer">
         ระบบนิเทศออนไลน์สำหรับสถานศึกษาเอกชนในระบบ จังหวัดนราธิวาส<br>
         <span class="org">สำนักงานการศึกษาเอกชนจังหวัดนราธิวาส</span>
