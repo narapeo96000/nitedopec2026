@@ -13,7 +13,7 @@ function normalizeForm(v) {
 // ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส
 // ใช้ชีต ADDR_SCHOOL + DATA_SCHOOL + USERS (USERS ร่วมกับระบบอื่น ภายใน Spreadsheet เดียวกัน)
 // อ้างอิง: แผนนิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียนโรงเรียนเอกชนในระบบ จ.นราธิวาส
-// โครงสร้างชีต ADDR_SCHOOL (เริ่มข้อมูลจริงที่แถว 6):
+// โครงสร้างชีต ADDR_SCHOOL (หัวตารางแถว 1, ข้อมูลเริ่มแถว 2):
 //   A=รหัส, B=ชื่อโรงเรียน, C=ที่อยู่, D=อำเภอ, E=ตำบล, F=โทรศัพท์,
 //   G=รูปแบบการจัดการศึกษา (แบบสอนสามัญ / แบบสอนสามัญควบคู่ศาสนาอิสลาม),
 //   H=ผู้บริหาร, I=จำนวนครู, J=จำนวนนักเรียน, K=พิกัดแผนที่
@@ -28,6 +28,7 @@ const SHEET_DATA_SCHOOL = 'DATA_SCHOOL';
 const SHEET_ADDR_SCHOOL = 'ADDR_SCHOOL';
 const SHEET_USERS = 'USERS';
 const SCHOOL_ADDR_COLS = 11;
+const SCHOOL_DATA_START_ROW = 2;
 
 // DATA_SCHOOL (15 คอลัมน์): Timestamp, ID, ชื่อโรงเรียน, รูปแบบ, ส1(0-44), ส2(0-16), ตรวจเยี่ยม(0-16), สุ่มตรวจ(0-8), รวมส1, ร้อยละ, ระดับ, รายละเอียด, ผู้นิเทศ, แก้ไขครั้งล่าสุด, ผู้แก้ไขล่าสุด
 const DATA_HEADERS = ['Timestamp', 'ID', 'ชื่อโรงเรียน', 'รูปแบบ', 'ส่วนที่1/44', 'ส่วนที่2/16', 'ตรวจเยี่ยม/16', 'สุ่มตรวจ/8', 'รวมส1', 'ร้อยละ', 'ระดับ', 'รายละเอียด', 'ผู้นิเทศ', 'แก้ไขครั้งล่าสุด', 'ผู้แก้ไขล่าสุด'];
@@ -246,8 +247,7 @@ function ensureSheets() {
   if(!addr) {
     const ns = ss.insertSheet(SHEET_ADDR_SCHOOL);
     ns.getRange(1, 1, 1, ADDR_HEADERS.length).setValues([ADDR_HEADERS]);
-    ns.getRange(2, 1, 1, ADDR_HEADERS.length).setValues([[ADDR_HEADERS[0],'',ADDR_HEADERS[2],ADDR_HEADERS[3],ADDR_HEADERS[4],ADDR_HEADERS[5],ADDR_HEADERS[6],ADDR_HEADERS[7],ADDR_HEADERS[8],ADDR_HEADERS[9],ADDR_HEADERS[10]]]);
-  } else if(addr.getLastRow() < 6) {
+  } else if(addr.getLastRow() < SCHOOL_DATA_START_ROW) {
     addr.getRange(1, 1, 1, ADDR_HEADERS.length).setValues([ADDR_HEADERS]);
   }
   return ss;
@@ -302,14 +302,14 @@ function getSchoolEvaluations(id) {
   return {success: true, data: list};
 }
 
-// --- รายชื่อสถานศึกษา (ADDR_SCHOOL แถว 6 เป็นต้นไป) ---
+// --- รายชื่อสถานศึกษา (ADDR_SCHOOL แถว 2 เป็นต้นไป) ---
 function getSchoolList() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(SHEET_ADDR_SCHOOL);
   if(!sheet) return {success: true, data: []};
   const lastRow = sheet.getLastRow();
-  if(lastRow < 6) return {success: true, data: []};
-  const rows = sheet.getRange(6, 1, lastRow - 5, SCHOOL_ADDR_COLS).getValues();
+  if(lastRow < SCHOOL_DATA_START_ROW) return {success: true, data: []};
+  const rows = sheet.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, SCHOOL_ADDR_COLS).getValues();
   const list = [];
   for(let i = 0; i < rows.length; i++) {
     if(String(rows[i][0]).trim() === '') continue;
@@ -337,14 +337,14 @@ function getSchoolData(id) {
   const sheet = ss.getSheetByName(SHEET_ADDR_SCHOOL);
   if(sheet) {
     const lastRow = sheet.getLastRow();
-    if(lastRow >= 6) {
-      const rows = sheet.getRange(6, 1, lastRow - 5, SCHOOL_ADDR_COLS).getValues();
+    if(lastRow >= SCHOOL_DATA_START_ROW) {
+      const rows = sheet.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, SCHOOL_ADDR_COLS).getValues();
       for(let i = 0; i < rows.length; i++) {
         if(String(rows[i][0]).trim() === id) {
           return {
             success: true,
             data: {
-              row: i + 6,
+              row: i + SCHOOL_DATA_START_ROW,
               id: rows[i][0], name: rows[i][1], address: rows[i][2],
               dist: rows[i][3], subdist: rows[i][4], phone: rows[i][5],
               form: normalizeForm(rows[i][6]),
@@ -370,11 +370,11 @@ function saveSchoolPin(payload) {
   const sheet = ss.getSheetByName(SHEET_ADDR_SCHOOL);
   if (!sheet) return {success: false, message: 'ไม่พบชีต ADDR_SCHOOL'};
   const lastRow = sheet.getLastRow();
-  if (lastRow < 6) return {success: false, message: 'ไม่มีข้อมูลโรงเรียน'};
-  const ids = sheet.getRange(6, 1, lastRow - 5, 1).getValues();
+  if (lastRow < SCHOOL_DATA_START_ROW) return {success: false, message: 'ไม่มีข้อมูลโรงเรียน'};
+  const ids = sheet.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, 1).getValues();
   for (let i = 0; i < ids.length; i++) {
     if (String(ids[i][0]).trim() === id) {
-      sheet.getRange(6 + i, 11).setValue(coords);
+      sheet.getRange(SCHOOL_DATA_START_ROW + i, 11).setValue(coords);
       return {success: true, message: 'บันทึกพิกัดแผนที่เรียบร้อย'};
     }
   }
@@ -481,8 +481,8 @@ function getStatsSchool() {
   const addr = ss.getSheetByName(SHEET_ADDR_SCHOOL);
   if(addr) {
     const lastRow = addr.getLastRow();
-    if(lastRow >= 6) {
-      const vals = addr.getRange(6, 1, lastRow - 5, SCHOOL_ADDR_COLS).getValues();
+    if(lastRow >= SCHOOL_DATA_START_ROW) {
+      const vals = addr.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, SCHOOL_ADDR_COLS).getValues();
       for(let i = 0; i < vals.length; i++) {
         if(String(vals[i][0]).trim() === '') continue;
         totalSchools++;
@@ -698,8 +698,8 @@ function fetchStatisticsForAISchool() {
   const lines = [];
   if (sheet) {
     const lastRow = sheet.getLastRow();
-    if (lastRow >= 6) {
-      const data = sheet.getRange(6, 1, lastRow - 5, SCHOOL_ADDR_COLS).getValues();
+    if (lastRow >= SCHOOL_DATA_START_ROW) {
+      const data = sheet.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, SCHOOL_ADDR_COLS).getValues();
       for (let i = 0; i < data.length; i++) {
         if (String(data[i][0]).trim() === '') continue;
         stats.count++;

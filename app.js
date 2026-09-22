@@ -665,7 +665,7 @@ async function startDash() {
     SCHOOLS = (r.data || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const sel = $('#schoolSelect');
     sel.innerHTML = '<option value="">— เลือกสถานศึกษา —</option>' + SCHOOLS.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
-    if (!SCHOOLS.length) $('#pinCard').innerHTML = `<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ <br>ผู้ดูแลสามารถพิมพ์ข้อมูลลงชีต ADDR_SCHOOL (แถวที่ 6 เป็นต้นไป)</div>`;
+    if (!SCHOOLS.length) $('#pinCard').innerHTML = `<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ <br>ผู้ดูแลสามารถพิมพ์ข้อมูลลงชีต ADDR_SCHOOL (เริ่มแถวที่ 2)</div>`;
   } else {
     $('#pinCard').innerHTML = `<div class="empty">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อโรงเรียนได้')}</div>`;
   }
