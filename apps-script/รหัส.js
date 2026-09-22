@@ -70,6 +70,8 @@ function doPost(e) {
       res = getSchoolList();
     } else if (action === 'getStatsPublic') {
       res = getStatsSchool();
+    } else if (action === 'debugSchools') {
+      res = debugSchools();
     } else if (action === 'getStatsSchool') {
       res = getStatsSchool();
     } else if (action === 'getSchoolData') {
@@ -467,6 +469,27 @@ function deleteSchoolEvaluation(payload) {
   if(row < 2 || row > ds.getLastRow()) return {success: false, message: 'ไม่พบแถวข้อมูล'};
   ds.deleteRow(row);
   return {success: true, message: 'ลบผลการนิเทศเรียบร้อยแล้ว'};
+}
+
+// --- debug: ดู row count และข้อมูลดิบ ---
+function debugSchools() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const addr = ss.getSheetByName(SHEET_ADDR_SCHOOL);
+  if (!addr) return { success: true, message: 'no sheet' };
+  const lastRow = addr.getLastRow();
+  const totalCols = addr.getLastColumn();
+  // อ่านข้อมูลตั้งแต่แถวเริ่มต้น โดยจำกัดผลตรวจไว้ 200 แถว
+  const dataRows = Math.max(0, lastRow - SCHOOL_DATA_START_ROW + 1);
+  const maxRows = Math.min(200, dataRows);
+  const vals = maxRows ? addr.getRange(SCHOOL_DATA_START_ROW, 1, maxRows, SCHOOL_ADDR_COLS).getValues() : [];
+  let count = 0;
+  const emptyIds = [];
+  for (let i = 0; i < vals.length; i++) {
+    const id = String(vals[i][0]).trim();
+    if (id === '') { emptyIds.push(i + SCHOOL_DATA_START_ROW); continue; }
+    count++;
+  }
+  return { success: true, lastRow, totalCols, SCHOOL_ADDR_COLS, maxRows, totalDataRows: vals.length, nonEmptyIds: count, emptyIdRows: emptyIds };
 }
 
 // --- สถิติระบบนิเทศโรงเรียนเอกชน (ADDR_SCHOOL + DATA_SCHOOL + USERS) ---
