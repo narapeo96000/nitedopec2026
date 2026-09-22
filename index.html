@@ -303,6 +303,19 @@ textarea.note{width:100%;resize:vertical}
 .school-pick-name{font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px}
 .school-pick-dist{font-size:12px;color:#64748b;margin-bottom:2px}
 .school-pick-form{font-size:11px;color:#0f766e;background:#ccfbf1;display:inline-block;padding:2px 8px;border-radius:10px}
+.area-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;padding:12px}
+.area-field{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:#475569}
+.area-field input,.area-field textarea{width:100%;font-weight:400}
+.area-checks,.area-score{display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:8px 0}
+.area-checks label,.area-score label{display:inline-flex;align-items:center;gap:4px;font-weight:400}
+.area-question{padding:10px 12px;background:#f0fdfa;color:#115e59;font-weight:600}
+.area-items{padding:8px 12px}
+.area-item{padding:12px 0;border-bottom:1px solid var(--bord)}
+.area-item:last-child{border-bottom:0}
+.area-q{line-height:1.6}
+.area-evidence{font-size:12px;color:#64748b;background:#f8fafc;padding:8px 10px;border-radius:8px;margin-top:8px}
+.area-actions{display:flex;justify-content:flex-end;padding:14px 0}
+@media (max-width:600px){.area-grid{grid-template-columns:1fr}.area-checks{flex-direction:column;align-items:flex-start}}
 @media (max-width:760px){
   .main{flex-direction:column}
   .side{width:100%;flex:none;max-height:none;position:static;border-right:none;border-bottom:1px solid var(--bord)}

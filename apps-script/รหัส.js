@@ -77,6 +77,10 @@ function doPost(e) {
       res = getSchoolEvaluations(payload);
     } else if (action === 'saveSchoolEvaluation') {
       res = saveSchoolEvaluation(payload);
+    } else if (action === 'getAreaEvaluations') {
+      res = getAreaEvaluations(payload);
+    } else if (action === 'saveAreaEvaluation') {
+      res = saveAreaEvaluation(payload);
     } else if (action === 'saveSchoolPin') {
       res = saveSchoolPin(payload);
     } else if (action === 'deleteSchoolEvaluation') {
@@ -748,4 +752,49 @@ function callGeminiAPI(userMessage, contextData, settings) {
     } catch (err) { continue; }
   }
   return offlineChatReply(String(userMessage || '').toLowerCase());
+}
+
+// แบบนิเทศทั่วไประดับพื้นที่เก็บแยกจาก DATA_SCHOOL เพื่อคงรูปแบบข้อมูลเดิมไว้
+const SHEET_AREA_EVALUATIONS = 'AREA_EVALUATIONS';
+const AREA_EVALUATION_HEADERS = ['Timestamp', 'ID', 'ชื่อโรงเรียน', 'วันที่นิเทศ', 'ผู้นิเทศ', 'รายละเอียด'];
+
+function ensureAreaEvaluationsSheet() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(SHEET_AREA_EVALUATIONS);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_AREA_EVALUATIONS);
+    sheet.getRange(1, 1, 1, AREA_EVALUATION_HEADERS.length).setValues([AREA_EVALUATION_HEADERS]);
+  }
+  return sheet;
+}
+
+function getAreaEvaluations(id) {
+  const schoolId = String(typeof id === 'object' && id !== null ? (id.id || '') : id || '').trim();
+  if (!schoolId) return { success: false, message: 'ไม่พบรหัสโรงเรียน' };
+  const sheet = ensureAreaEvaluationsSheet();
+  const lastRow = sheet.getLastRow();
+  const list = [];
+  if (lastRow >= 2) {
+    const rows = sheet.getRange(2, 1, lastRow - 1, AREA_EVALUATION_HEADERS.length).getValues();
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][1]).trim() !== schoolId) continue;
+      let details = {};
+      try { details = JSON.parse(rows[i][5] || '{}'); } catch (e) {}
+      list.push({ timestamp: formatDate(rows[i][0]), evalDate: details.visitDate || '', supervisor: rows[i][4] || '' });
+    }
+  }
+  list.sort((a, b) => a.timestamp < b.timestamp ? 1 : -1);
+  return { success: true, data: list };
+}
+
+function saveAreaEvaluation(payload) {
+  const p = (typeof payload === 'object' && payload !== null) ? payload : {};
+  const id = String(p.id || '').trim();
+  const name = String(p.name || '').trim();
+  if (!id || !name) return { success: false, message: 'กรุณาเลือกสถานศึกษา' };
+  const details = p.details || {};
+  if (!details.ratings || !Object.keys(details.ratings).length) return { success: false, message: 'กรุณาให้คะแนนอย่างน้อย 1 ข้อ' };
+  const sheet = ensureAreaEvaluationsSheet();
+  sheet.appendRow([new Date(), id, name, details.visitDate || '', String(p.supervisor || ''), JSON.stringify(details)]);
+  return { success: true, message: 'บันทึกแบบนิเทศทั่วไประดับพื้นที่เรียบร้อยแล้ว' };
 }

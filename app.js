@@ -630,6 +630,7 @@ async function startDash() {
         <button class="tb-nav tab-btn" data-target="tab-5" onclick="switchTab('tab-5')">🧐 ตรวจเยี่ยมชั้นเรียน</button>
         <button class="tb-nav tab-btn" data-target="tab-6" onclick="switchTab('tab-6')">🔧 สะท้อนผล/แผนพัฒนา</button>
         <button class="tb-nav tab-btn" data-target="tab-7" onclick="switchTab('tab-7')">✅ ติดตาม/สรุป</button>
+        <button class="tb-nav tab-btn" data-target="tab-area" onclick="showAreaEvaluation()">🧭 นิเทศทั่วไประดับพื้นที่</button>
         <button class="tb-nav tab-btn" data-target="tab-files" onclick="showUploadsPanel()">📎 ไฟล์/หลักฐาน</button>
         <div class="nav-sep"></div>
         <button class="tb-nav tab-btn" data-target="tab-hist" onclick="showEvalHistory()">📜 ประวัติการนิเทศ</button>
@@ -648,6 +649,7 @@ async function startDash() {
         <div id="tab-5" class="panel"></div>
         <div id="tab-6" class="panel"></div>
         <div id="tab-7" class="panel"></div>
+        <div id="tab-area" class="panel"><div id="areaWrap"></div></div>
         <div id="tab-files" class="panel"><div id="filesWrap"></div></div>
         <div id="tab-hist" class="panel"><div id="histWrap"></div></div>
         <div id="tab-stats" class="panel"><div id="statsWrap"></div></div>
@@ -708,6 +710,7 @@ async function startDashWithSchool(schoolId) {
         <button class="tb-nav tab-btn" data-target="tab-5" onclick="switchTab('tab-5')">🧐 ตรวจเยี่ยมชั้นเรียน</button>
         <button class="tb-nav tab-btn" data-target="tab-6" onclick="switchTab('tab-6')">🔧 สะท้อนผล/แผนพัฒนา</button>
         <button class="tb-nav tab-btn" data-target="tab-7" onclick="switchTab('tab-7')">✅ ติดตาม/สรุป</button>
+        <button class="tb-nav tab-btn" data-target="tab-area" onclick="showAreaEvaluation()">🧭 นิเทศทั่วไประดับพื้นที่</button>
         <button class="tb-nav tab-btn" data-target="tab-files" onclick="showUploadsPanel()">📎 ไฟล์/หลักฐาน</button>
         <div class="nav-sep"></div>
         <button class="tb-nav tab-btn" data-target="tab-hist" onclick="showEvalHistory()">📜 ประวัติการนิเทศ</button>
@@ -726,6 +729,7 @@ async function startDashWithSchool(schoolId) {
         <div id="tab-5" class="panel"></div>
         <div id="tab-6" class="panel"></div>
         <div id="tab-7" class="panel"></div>
+        <div id="tab-area" class="panel"><div id="areaWrap"></div></div>
         <div id="tab-files" class="panel"><div id="filesWrap"></div></div>
         <div id="tab-hist" class="panel"><div id="histWrap"></div></div>
         <div id="tab-stats" class="panel"><div id="statsWrap"></div></div>

@@ -3,6 +3,8 @@
 // ============================================================
 let STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
 let EDIT_ROW = null;
+let AREA_FORM_STATE = {};
+let AREA_ACTIVE_SCHOOL = '';
 
 function sumSc(prefix) {
   let s = 0;
@@ -329,12 +331,95 @@ function buildTab7() {
 // จัดการการแสดง panel + switchTab
 // ============================================================
 function switchTab(id) {
-  ['tab-1','tab-2','tab-3','tab-4','tab-5','tab-6','tab-7','tab-files','tab-hist','tab-stats','tab-users','tab-info'].forEach(t =>
+  ['tab-1','tab-2','tab-3','tab-4','tab-5','tab-6','tab-7','tab-area','tab-files','tab-hist','tab-stats','tab-users','tab-info'].forEach(t =>
     $(`#${t}`).classList.toggle('active', t === id));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.target === id));
   applyAnswersToDom($(`#${id}`));
   sidebarTouched = true;
 }
+
+// แบบนิเทศทั่วไประดับพื้นที่ (เครื่องมือแยกจากแบบนิเทศเดิม)
+const AREA_ITEMS = [
+  { group: 'ด้านที่ 1 การบริหารและระบบคุณภาพ', question: 'โรงเรียนมีเป้าหมายการพัฒนาคุณภาพผู้เรียนที่ชัดเจน', items: [
+    'โรงเรียนมีเป้าหมายการพัฒนาคุณภาพผู้เรียนที่ชัดเจน',
+    'มีการใช้ข้อมูลผู้เรียนและผลการประเมินในการวางแผนพัฒนา',
+    'มีการติดตามการดำเนินงานและนำผลไปปรับปรุง',
+    'มีระบบนิเทศภายในหรือการพัฒนาครูอย่างต่อเนื่อง'
+  ]},
+  { group: 'ด้านที่ 2 การนำหลักสูตรไปใช้', items: [
+    'โรงเรียนมีหลักสูตรสถานศึกษาที่ใช้เป็นกรอบในการจัดการเรียนรู้จริง',
+    'โครงสร้างรายวิชา เวลาเรียน และระดับชั้นมีความชัดเจน',
+    'ครูเข้าใจว่าในรายวิชาหรือชั้นที่สอน ผู้เรียนควรรู้อะไรและทำอะไรได้',
+    'ครูมีการเตรียมหน่วย แผน กิจกรรม หรือสื่อที่สัมพันธ์กับเป้าหมายการเรียนรู้'
+  ]},
+  { group: 'ด้านที่ 3 การจัดการเรียนรู้', items: [
+    'ครูทำให้ผู้เรียนเข้าใจว่าเรียนเรื่องอะไรและต้องการให้เกิดการเรียนรู้อะไร',
+    'กิจกรรมเหมาะสมกับวัย ระดับ และความแตกต่างของผู้เรียน',
+    'ผู้เรียนส่วนใหญ่มีส่วนร่วมในการคิด พูด อ่าน เขียน ทำงานหรือปฏิบัติ',
+    'ครูใช้คำถาม สื่อ หรือกิจกรรมที่ช่วยให้ผู้เรียนเกิดความเข้าใจ',
+    'ครูเชื่อมโยงสิ่งที่เรียนกับสถานการณ์หรือชีวิตจริงตามความเหมาะสม',
+    'ครูตรวจสอบความเข้าใจและช่วยเหลือผู้เรียนที่ยังเรียนรู้ไม่ถึงเป้าหมาย'
+  ]}
+];
+
+function areaTextField(key, label, value, type) {
+  const current = AREA_FORM_STATE[key] !== undefined ? AREA_FORM_STATE[key] : (value || '');
+  return `<label class="area-field"><span>${esc(label)}</span><input data-area-field="${key}" type="${type || 'text'}" value="${esc(current)}"></label>`;
+}
+
+async function showAreaEvaluation() {
+  switchTab('tab-area');
+  const wrap = $('#areaWrap');
+  if (!SELECTED) {
+    wrap.innerHTML = `<div class="empty">กรุณาเลือกสถานศึกษาจากเมนูด้านซ้ายก่อนเริ่มทำแบบนิเทศทั่วไประดับพื้นที่</div>`;
+    return;
+  }
+  if (AREA_ACTIVE_SCHOOL !== SELECTED.id) {
+    AREA_ACTIVE_SCHOOL = SELECTED.id;
+    AREA_FORM_STATE = {};
+  }
+  const form = SCHOOLS.find(s => s.id === SELECTED.id) || SELECTED;
+  const checks = AREA_FORM_STATE.formTypes || [];
+  const types = ['แบบสอนสามัญ', 'แบบสอนสามัญควบคู่ศาสนาอิสลาม'];
+  wrap.innerHTML = `<div class="panel-head"><h2>🧭 แบบนิเทศทั่วไประดับพื้นที่</h2></div>
+    <div class="note" style="background:#ecfeff;border-left:4px solid #0e7490">แบบนิเทศนี้เป็นเครื่องมือแยกสำหรับการนิเทศระดับพื้นที่ อ้างอิงคู่มือ หน้า 11–13 โดยข้อมูลจะบันทึกแยกจากแบบนิเทศเดิม</div>
+    <div class="form-wrap area-form">
+      <div class="grp"><div class="grp-h">1. ข้อมูลทั่วไป</div><div class="area-grid">
+        ${areaTextField('schoolName','ชื่อโรงเรียน',form.name)}
+        ${areaTextField('district','อำเภอ',form.dist)}
+        <div class="area-field"><span>รูปแบบการจัดการศึกษา</span><div class="area-checks">${types.map((v,i)=>`<label><input type="checkbox" data-area-type="${i}" ${checks.includes(v) || (!checks.length && String(form.form||'').includes(i ? 'ควบคู่' : 'สามัญ') && (i===1 ? String(form.form||'').includes('ควบคู่') : !String(form.form||'').includes('ควบคู่')))?'checked':''}> ${esc(v)}</label>`).join('')}</div></div>
+        ${areaTextField('gradeLevels','ระดับชั้นที่เปิดสอน','')}
+        ${areaTextField('studentCount','จำนวนนักเรียน','')}
+        ${areaTextField('teacherCount','จำนวนครู','')}
+        ${areaTextField('visitDate','วันที่นิเทศ',new Date().toISOString().slice(0,10),'date')}
+        ${areaTextField('classVisited','ชั้นเรียนที่ตรวจเยี่ยม','')}
+        ${areaTextField('subject','รายวิชา','')}
+        ${areaTextField('informant','ชื่อผู้ให้ข้อมูล','')}
+        ${areaTextField('supervisionTeam','คณะนิเทศ','')}
+      </div></div>
+      <div class="grp"><div class="grp-h">2. จุดมุ่งหมายและวิธีดำเนินการ</div><p>ใช้สำหรับติดตามคุณภาพการบริหาร การนำหลักสูตรไปใช้ การจัดการเรียนรู้ และผลที่เกิดขึ้นกับผู้เรียน เพื่อค้นหาจุดแข็ง ประเด็นที่ควรพัฒนา และความต้องการสนับสนุนอย่างต่อเนื่อง</p><p>กระบวนการประกอบด้วยการสอบถามและสนทนา การพิจารณาข้อมูลและหลักฐานที่เกี่ยวข้อง การตรวจเยี่ยมชั้นเรียน และการสรุปสะท้อนผลร่วมกัน เครื่องมือนี้ใช้เพื่อพัฒนา ไม่ใช้จัดอันดับโรงเรียนหรือบุคลากร</p></div>
+      <div class="grp"><div class="grp-h">เกณฑ์การพิจารณา</div><div class="table-wrap"><table class="tb"><thead><tr><th>ระดับ</th><th>ความหมาย</th></tr></thead><tbody><tr><td>2 ทำได้ชัดเจน</td><td>มีการดำเนินงานจริงและเห็นหลักฐานหรือผลจากการปฏิบัติ</td></tr><tr><td>1 กำลังพัฒนา</td><td>มีการดำเนินงานแล้วบางส่วน แต่ยังไม่ต่อเนื่องหรือไม่ชัดเจน</td></tr><tr><td>0 ต้องได้รับการช่วยเหลือ</td><td>ยังไม่พบการดำเนินงาน หรือเป็นประเด็นที่ควรได้รับการช่วยเหลือ</td></tr><tr><td>N/A</td><td>ไม่เกี่ยวข้องหรือมีข้อมูลไม่เพียงพอในการพิจารณาครั้งนี้</td></tr></tbody></table></div><p class="small text-muted">ไม่จำเป็นต้องตรวจเอกสารทุกฉบับ ให้เลือกเฉพาะหลักฐานที่สัมพันธ์กับประเด็นที่กำลังนิเทศ</p></div>
+      ${AREA_ITEMS.map((g,gi)=>`<div class="grp"><div class="grp-h">${esc(g.group)}</div><div class="area-question">คำถาม: ${gi===0?'โรงเรียนรู้หรือไม่ว่าต้องการพัฒนาผู้เรียนเรื่องใด และใช้ข้อมูลในการพัฒนาโรงเรียนจริงหรือไม่':gi===1?'หลักสูตรที่โรงเรียนกำหนดถูกนำไปใช้ในการจัดการเรียนรู้จริงหรือไม่':'ในชั้นเรียน ผู้เรียนได้คิด ลงมือทำ และเกิดการเรียนรู้หรือไม่'}</div><div class="area-items">${g.items.map((q,qi)=>{const n=g.items.slice(0,qi).length+AREA_ITEMS.slice(0,gi).reduce((s,x)=>s+x.items.length,0)+1;const v=(AREA_FORM_STATE.ratings||{})[n]||'';const note=(AREA_FORM_STATE.notes||{})[n]||'';return `<div class="area-item"><div class="area-q"><b>${n}.</b> ${esc(q)}</div><div class="area-score">${['2','1','0','N/A'].map(x=>`<label><input type="radio" name="area-score-${n}" value="${x}" data-area-score="${n}" ${v===x?'checked':''}> ${x}</label>`).join('')}</div><label class="area-field"><span>สิ่งที่พบ/หมายเหตุ</span><textarea data-area-note="${n}" rows="2" placeholder="บันทึกหลักฐานหรือข้อสังเกต">${esc(note)}</textarea></label>${n<=4?`<div class="area-evidence"><b>ตัวอย่างหลักฐาน:</b> แผนพัฒนาคุณภาพ แผนปฏิบัติการ ข้อมูลผู้เรียนและผลประเมิน SAR บันทึกนิเทศภายใน หรือการสนทนากับผู้บริหารและครู</div>`:''}</div>`}).join('')}</div></div>`).join('')}
+      <div class="area-actions"><button class="btn btn-primary" onclick="saveAreaEvaluation()">💾 บันทึกแบบนิเทศทั่วไประดับพื้นที่</button></div>
+    </div><div class="form-wrap"><div class="grp"><div class="grp-h">ประวัติแบบนิเทศทั่วไประดับพื้นที่</div><div id="areaHistory" class="loading">กำลังโหลดประวัติ...</div></div></div>`;
+  wrap.querySelectorAll('[data-area-field]').forEach(x=>x.addEventListener('input',()=>AREA_FORM_STATE[x.dataset.areaField]=x.value));
+  wrap.querySelectorAll('[data-area-type]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.formTypes=Array.from(wrap.querySelectorAll('[data-area-type]:checked')).map(c=>types[Number(c.dataset.areaType)])}));
+  wrap.querySelectorAll('[data-area-score]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.ratings=AREA_FORM_STATE.ratings||{};AREA_FORM_STATE.ratings[x.dataset.areaScore]=x.value}));
+  wrap.querySelectorAll('[data-area-note]').forEach(x=>x.addEventListener('input',()=>{AREA_FORM_STATE.notes=AREA_FORM_STATE.notes||{};AREA_FORM_STATE.notes[x.dataset.areaNote]=x.value}));
+  const history = await post('getAreaEvaluations', SELECTED.id);
+  const hw = $('#areaHistory');
+  hw.innerHTML = history && history.success && history.data.length ? `<table class="tb"><thead><tr><th>วันที่บันทึก</th><th>วันที่นิเทศ</th><th>ผู้นิเทศ</th></tr></thead><tbody>${history.data.map(x=>`<tr><td>${esc(x.timestamp)}</td><td>${esc(x.evalDate||'—')}</td><td>${esc(x.supervisor||'—')}</td></tr>`).join('')}</tbody></table>` : `<div class="empty">ยังไม่มีประวัติแบบนิเทศนี้สำหรับสถานศึกษาที่เลือก</div>`;
+}
+
+async function saveAreaEvaluation() {
+  if (!SELECTED) { toast('กรุณาเลือกสถานศึกษาก่อน', false); return; }
+  const payload = { id: SELECTED.id, name: SELECTED.name, supervisor: CURRENT_USER ? CURRENT_USER.fname + ' (' + CURRENT_USER.username + ')' : '', details: AREA_FORM_STATE };
+  if (!Object.keys(payload.details.ratings || {}).length) { toast('กรุณาให้คะแนนอย่างน้อย 1 ข้อ', false); return; }
+  const res = await post('saveAreaEvaluation', payload);
+  if (res && res.success) { toast(res.message || 'บันทึกแบบนิเทศแล้ว', true); showAreaEvaluation(); }
+  else toast((res && res.message) || 'บันทึกไม่สำเร็จ', false);
+}
+
 function buildAll() {
   buildTab1(); buildTab2(); buildTab3(); buildTab4(); buildTab5(); buildTab6(); buildTab7();
   if (SELECTED) { initPinBar(); }
