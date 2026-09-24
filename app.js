@@ -1,5 +1,5 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbzOIsAXOkPAL44dOA8KFxZE7WI3TCtS0ceyswLovl3xpzIfZn6O3wr8lou7FLeHw4Ym3Q/exec";
-const APP_NAME = "ระบบนิเทศออนไลน์ โรงเรียนเอกชนจ.นราธิวาส";
+const APP_NAME = "ระบบนิเทศออนไลน์ โรงเรียนเอกชน จ.นราธิวาส";
 const MANUAL_NAME = "แผนนิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียนโรงเรียนเอกชนในระบบ จ.นราธิวาส";
 
 // -------------------------------------------------------------
@@ -266,7 +266,7 @@ function showLogin() {
     <div class="container">
       <div class="brand">
         <div class="logo">🏫</div>
-        <h1>ระบบนิเทศออนไลน์ โรงเรียนเอกชนจ.นราธิวาส</h1>
+        <h1>ระบบนิเทศออนไลน์ โรงเรียนเอกชน จ.นราธิวาส</h1>
         <p class="sub-title">นิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียนโรงเรียนเอกชนในระบบ<br>(แบบสอนสามัญ · แบบสอนสามัญควบคู่ศาสนาอิสลาม)</p>
         <div class="org-line">
           <span class="org">สำนักงานจังหวัดนราธิวาส</span> |
@@ -507,7 +507,7 @@ function showRegister() {
         <div class="brand" style="margin:0 0 6px;">
           <div class="logo" style="width:64px;height:64px;font-size:1.8rem;border-radius:20px;">🏫</div>
           <h1>สมัครสมาชิก</h1>
-          <p class="sub-title">ระบบนิเทศออนไลน์ โรงเรียนเอกชนจ.นราธิวาส</p>
+          <p class="sub-title">ระบบนิเทศออนไลน์ โรงเรียนเอกชน จ.นราธิวาส</p>
         </div>
         <div id="regMsg" class="auth-msg"></div>
         <label>ชื่อ-นามสกุล</label>
@@ -772,7 +772,7 @@ async function showDashboard() {
     <div class="dash-hero">
       <div class="dash-hero-text">
         <h1>👋 สวัสดี ${esc(CURRENT_USER ? CURRENT_USER.fname : '')}</h1>
-        <p>ยินดีต้อนรับสู่ระบบนิเทศออนไลน์ โรงเรียนเอกชนจ.นราธิวาส</p>
+        <p>ยินดีต้อนรับสู่ระบบนิเทศออนไลน์ โรงเรียนเอกชน จ.นราธิวาส</p>
       </div>
       <button class="btn-start" onclick="startInspection()">
         <span class="btn-start-icon">🚀</span>
