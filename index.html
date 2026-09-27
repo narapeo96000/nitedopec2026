@@ -145,6 +145,15 @@ a{color:var(--pri)}
 .tb-user .role{background:#115e59;padding:2px 8px;border-radius:20px;font-size:12px}
 .main{display:flex;min-height:calc(100vh - 52px)}
 .side{width:250px;flex:0 0 250px;background:#fff;border-right:1px solid var(--bord);padding:14px;overflow-y:auto;max-height:calc(100vh - 52px);position:sticky;top:52px}
+.side{transition:width .2s ease,flex-basis .2s ease,box-shadow .2s ease;overflow-x:hidden}
+.side-close{display:none}
+@media (min-width:761px){
+  .side{width:64px;flex-basis:64px;padding:14px 8px}
+  .side:hover,.side:focus-within{width:250px;flex-basis:250px;box-shadow:8px 0 22px rgba(15,23,42,.12);z-index:40}
+  .side:not(:hover):not(:focus-within) .side-card{height:0;overflow:hidden;opacity:0;margin:0;padding:0;pointer-events:none}
+  .side:not(:hover):not(:focus-within) .nav{margin-top:0}
+  .side:not(:hover):not(:focus-within) .tb-nav{white-space:nowrap;overflow:hidden;padding-left:12px;padding-right:12px}
+}
 .side-card h4{font-size:14px;color:#065f46;margin-bottom:8px}
 .side-card select{width:100%;margin-bottom:10px}
 .pin-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}
