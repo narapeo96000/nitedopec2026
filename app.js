@@ -537,9 +537,16 @@ async function doLogin(e) {
   const u = $('#username').value.trim();
   const p = $('#password').value;
   const msg = $('#loginMsg');
-  if (!u || !p) { msg.className = 'auth-msg err'; msg.textContent = 'กรุณากรอก Username และ Password'; return false; }
+  const alertLogin = (options) => window.Swal ? Swal.fire(options) : Promise.resolve();
+  if (!u || !p) {
+    msg.className = 'auth-msg err';
+    msg.textContent = 'กรุณากรอก Username และ Password';
+    await alertLogin({ icon: 'warning', title: 'ข้อมูลไม่ครบถ้วน', text: 'กรุณากรอก Username และ Password', confirmButtonText: 'ตกลง' });
+    return false;
+  }
   msg.className = 'auth-msg err';
   msg.textContent = 'กำลังตรวจสอบข้อมูล...';
+  if (window.Swal) Swal.fire({ title: 'กำลังตรวจสอบการเข้าสู่ระบบ', text: 'กรุณารอสักครู่', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
   const r = await post('login', { username: u, password: p });
   if (r && r.success) {
     CURRENT_USER = r.userData;
@@ -550,14 +557,17 @@ async function doLogin(e) {
     }
     msg.className = 'auth-msg ok';
     msg.textContent = 'เข้าสู่ระบบสำเร็จ! กำลังโหลดระบบ...';
+    await alertLogin({ icon: 'success', title: 'เข้าสู่ระบบสำเร็จ', text: 'กำลังโหลดระบบนิเทศออนไลน์', timer: 900, showConfirmButton: false, allowOutsideClick: false });
     if (LOGIN_SCHOOL_ID) {
       startDashWithSchool(LOGIN_SCHOOL_ID);
     } else {
       startDash();
     }
   } else {
+    if (window.Swal) Swal.close();
     msg.className = 'auth-msg err';
     msg.textContent = (r && r.message) || 'เข้าสู่ระบบไม่สำเร็จ';
+    await alertLogin({ icon: 'error', title: 'เข้าสู่ระบบไม่สำเร็จ', text: (r && r.message) || 'Username หรือ Password ไม่ถูกต้อง', confirmButtonText: 'ตกลง' });
   }
   return false;
 }
