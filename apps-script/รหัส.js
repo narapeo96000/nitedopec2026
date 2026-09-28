@@ -29,9 +29,32 @@ const SHEET_ADDR_SCHOOL = 'ADDR_SCHOOL';
 const SHEET_USERS = 'USERS';
 const SCHOOL_ADDR_COLS = 11;
 const SCHOOL_DATA_START_ROW = 2;
+const SHEET_LOGFILE = 'logfile_opec';
+const LOGFILE_HEADERS = ['Timestamp', 'Action', 'Sheet', 'Row', 'Record ID', 'Actor', 'Before Data'];
 
 // DATA_SCHOOL (15 คอลัมน์): Timestamp, ID, ชื่อโรงเรียน, รูปแบบ, ส1(0-44), ส2(0-16), ตรวจเยี่ยม(0-16), สุ่มตรวจ(0-8), รวมส1, ร้อยละ, ระดับ, รายละเอียด, ผู้นิเทศ, แก้ไขครั้งล่าสุด, ผู้แก้ไขล่าสุด
 const DATA_HEADERS = ['Timestamp', 'ID', 'ชื่อโรงเรียน', 'รูปแบบ', 'ส่วนที่1/44', 'ส่วนที่2/16', 'ตรวจเยี่ยม/16', 'สุ่มตรวจ/8', 'รวมส1', 'ร้อยละ', 'ระดับ', 'รายละเอียด', 'ผู้นิเทศ', 'แก้ไขครั้งล่าสุด', 'ผู้แก้ไขล่าสุด'];
+
+function ensureLogfileSheet() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(SHEET_LOGFILE);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_LOGFILE);
+    sheet.getRange(1, 1, 1, LOGFILE_HEADERS.length).setValues([LOGFILE_HEADERS]);
+  } else if (sheet.getLastColumn() < LOGFILE_HEADERS.length) {
+    sheet.getRange(1, 1, 1, LOGFILE_HEADERS.length).setValues([LOGFILE_HEADERS]);
+  }
+  return sheet;
+}
+
+// สำรองข้อมูลแถวเดิมก่อนแก้ไขหรือลบ หากเขียน logfile ไม่สำเร็จให้หยุดรายการหลัก
+function backupSheetRow(sheet, row, action, actor, recordId) {
+  if (!sheet) throw new Error('ไม่พบชีตสำหรับสำรองข้อมูล');
+  row = Number(row);
+  if (!row || row < 2 || row > sheet.getLastRow()) throw new Error('ไม่พบแถวข้อมูลที่ต้องการสำรอง');
+  const values = sheet.getRange(row, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  ensureLogfileSheet().appendRow([new Date(), String(action || ''), sheet.getName(), row, String(recordId || values[1] || ''), String(actor || ''), JSON.stringify(values)]);
+}
 
 function getPing() { return 'pong ' + new Date().toISOString(); }
 
@@ -227,6 +250,11 @@ function setUserStatus(data) {
   if(!isAdmin) return {success: false, message: 'ไม่มีสิทธิ์ใช้งาน (เฉพาะผู้ดูแลระบบ)'};
   if(targetRow < 1) return {success: false, message: 'ไม่พบบัญชีผู้ใช้นี้'};
   if(status === 'ใช้งาน' || status === 'ระงับ') {
+    try {
+      backupSheetRow(sheet, targetRow, 'USER_STATUS_EDIT_BEFORE', admin, target);
+    } catch (backupError) {
+      return { success: false, message: 'สำรองข้อมูลก่อนแก้ไขสถานะไม่สำเร็จ จึงยกเลิกการแก้ไข: ' + backupError.message };
+    }
     sheet.getRange(targetRow, 5).setValue(status);
     return {success: true, message: (status === 'ใช้งาน' ? '✅ เปิดใช้งาน' : '⛔ ระงับ') + 'บัญชี "' + target + '" เรียบร้อย'};
   }
@@ -376,6 +404,11 @@ function saveSchoolPin(payload) {
   const ids = sheet.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, 1).getValues();
   for (let i = 0; i < ids.length; i++) {
     if (String(ids[i][0]).trim() === id) {
+      try {
+        backupSheetRow(sheet, SCHOOL_DATA_START_ROW + i, 'PIN_EDIT_BEFORE', '', id);
+      } catch (backupError) {
+        return { success: false, message: 'สำรองข้อมูลก่อนแก้ไขพิกัดไม่สำเร็จ จึงยกเลิกการแก้ไข: ' + backupError.message };
+      }
       sheet.getRange(SCHOOL_DATA_START_ROW + i, 11).setValue(coords);
       return {success: true, message: 'บันทึกพิกัดแผนที่เรียบร้อย'};
     }
@@ -391,12 +424,6 @@ function saveSchoolEvaluation(payload) {
   const e = payload.evalData || {};
 
   const addrSheet = ss.getSheetByName(SHEET_ADDR_SCHOOL);
-  if(addrSheet && t.row) {
-    addrSheet.getRange(t.row, 2, 1, 9).setValues([[
-      t.name, t.address, t.dist, t.subdist, t.phone, t.form, t.admin, t.staff, t.students
-    ]]);
-  }
-
   ensureSheets();
   const dataSheet = ss.getSheetByName(SHEET_DATA_SCHOOL);
   const supervisor = String(payload.supervisor || '');
@@ -423,6 +450,17 @@ function saveSchoolEvaluation(payload) {
 
   if(payload.editRow && !isNaN(payload.editRow)) {
     const row = Number(payload.editRow);
+    try {
+      backupSheetRow(dataSheet, row, 'EDIT_BEFORE', supervisor, t.id);
+      if (addrSheet && t.row) backupSheetRow(addrSheet, Number(t.row), 'EDIT_ADDR_BEFORE', supervisor, t.id);
+    } catch (backupError) {
+      return { success: false, message: 'สำรองข้อมูลก่อนแก้ไขไม่สำเร็จ จึงยกเลิกการแก้ไข: ' + backupError.message };
+    }
+    if(addrSheet && t.row) {
+      addrSheet.getRange(t.row, 2, 1, 9).setValues([[
+        t.name, t.address, t.dist, t.subdist, t.phone, t.form, t.admin, t.staff, t.students
+      ]]);
+    }
     dataSheet.getRange(row, 4).setValue(e.formType);
     dataSheet.getRange(row, 5).setValue(e.s1 !== undefined ? e.s1 : '');
     dataSheet.getRange(row, 6).setValue(e.s2 !== undefined ? e.s2 : '');
@@ -467,6 +505,12 @@ function deleteSchoolEvaluation(payload) {
   const ds = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_DATA_SCHOOL);
   if(!ds) return {success: false, message: 'ไม่พบชีต DATA_SCHOOL'};
   if(row < 2 || row > ds.getLastRow()) return {success: false, message: 'ไม่พบแถวข้อมูล'};
+  try {
+    const recordId = ds.getRange(row, 2).getValue();
+    backupSheetRow(ds, row, 'DELETE_BEFORE', admin, recordId);
+  } catch (backupError) {
+    return { success: false, message: 'สำรองข้อมูลก่อนลบไม่สำเร็จ จึงยกเลิกการลบ: ' + backupError.message };
+  }
   ds.deleteRow(row);
   return {success: true, message: 'ลบผลการนิเทศเรียบร้อยแล้ว'};
 }
