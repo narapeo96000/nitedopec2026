@@ -229,6 +229,7 @@ function restoreDraftIfAny() {
   document.querySelectorAll(`input[name=formType][value="${esc(ft)}"]`).forEach(x => x.checked = true);
   applyAnswersToDom();
   updateScoreBar();
+  if (typeof markFormDirty === 'function') markFormDirty();
   toast('กู้คืนข้อมูลร่างเรียบร้อย', true);
 }
 
@@ -597,8 +598,10 @@ async function doRegister(e) {
 }
 
 function logout() {
+  if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
   CURRENT_USER = null;
   SCHOOLS = []; SELECTED = null; STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
+  if (typeof setFormClean === 'function') setFormClean();
   if (AUTO_SAVE_INTERVAL) clearInterval(AUTO_SAVE_INTERVAL);
   localStorage.removeItem(REMEMBER_KEY);
   clearDraft();
@@ -629,6 +632,7 @@ async function startDash() {
         <div id="pinCard"></div>
         <div class="side-actions">
           <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
       </div>
@@ -709,6 +713,7 @@ async function startDashWithSchool(schoolId) {
         <div id="pinCard"></div>
         <div class="side-actions">
           <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
       </div>
@@ -896,6 +901,7 @@ async function showDashboard() {
 // เริ่มการนิเทศ (เลือกสถานศึกษา)
 // ============================================================
 function startInspection() {
+  if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
   // แสดง dropdown เลือกสถานศึกษาแบบเต็มหน้าจอ
   const root = el('tab-1');
   root.innerHTML = `
@@ -941,17 +947,24 @@ function resumeDraft(schoolName) {
   else startInspection();
 }
 
-async function loadSchool(id) {
-  if (!id) { SELECTED = null; return; }
+async function loadSchool(id, options = {}) {
+  if (!options.skipConfirm && typeof confirmDiscardChanges === 'function' && SELECTED && id !== SELECTED.id && !confirmDiscardChanges()) {
+    const sel = $('#schoolSelect');
+    if (sel) sel.value = SELECTED.id;
+    return;
+  }
+  if (!id) { SELECTED = null; if (typeof setFormClean === 'function') setFormClean(); return; }
   const r = await post('getSchoolData', id);
   if (!r || !r.success) { toast((r||{}).message || 'โหลดข้อมูลไม่สำเร็จ', false); return; }
   SELECTED = r.data;
   SCHOOLS = SCHOOLS.map(s => s.id === SELECTED.id ? { ...s, ...r.data } : s);
   STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
+  EDIT_ROW = null;
   buildAll();
+  if (typeof setFormClean === 'function') setFormClean();
   switchTab('tab-1');
   startAutoSave();
-  restoreDraftIfAny();
+  if (!options.skipDraft) restoreDraftIfAny();
   toast('เลือก ' + SELECTED.name + ' แล้ว', true);
 }
 
@@ -1016,6 +1029,12 @@ function initPinBar() {
 
 // boot
 document.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('beforeunload', e => {
+    if (typeof hasUnsavedChanges === 'function' && hasUnsavedChanges()) {
+      e.preventDefault();
+      e.returnValue = 'มีข้อมูลนิเทศที่ยังไม่ได้บันทึก';
+    }
+  });
   if (API_URL === 'APPS_SCRIPT_API_URL') {
     toast('ยังไม่ได้กำหนด URL ของระบบ (ติดต่อผู้ดูแล)', false);
   }

@@ -5,6 +5,36 @@ let STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, 
 let EDIT_ROW = null;
 let AREA_FORM_STATE = {};
 let AREA_ACTIVE_SCHOOL = '';
+let FORM_DIRTY = false;
+
+function markFormDirty() {
+  FORM_DIRTY = true;
+  const btn = $('#cancelEditBtn');
+  if (btn) btn.style.display = EDIT_ROW ? 'block' : 'none';
+}
+
+function setFormClean() {
+  FORM_DIRTY = false;
+  const btn = $('#cancelEditBtn');
+  if (btn) btn.style.display = 'none';
+}
+
+function hasUnsavedChanges() {
+  return !!FORM_DIRTY;
+}
+
+function confirmDiscardChanges() {
+  if (!hasUnsavedChanges()) return true;
+  return window.confirm('มีการแก้ไขข้อมูลนิเทศที่ยังไม่ได้บันทึก\nต้องการยกเลิกการแก้ไขและทิ้งข้อมูลหรือไม่?');
+}
+
+async function cancelEdit() {
+  if (!confirmDiscardChanges()) return;
+  const row = EDIT_ROW;
+  setFormClean();
+  if (row) await loadHistoryRow(row);
+  else if (SELECTED) await loadSchool(SELECTED.id, { skipConfirm: true, skipDraft: true });
+}
 
 function sumSc(prefix) {
   let s = 0;
@@ -63,6 +93,7 @@ function bindPanelEvents(root) {
       root.querySelectorAll(`button.sc[data-key="${key}"]`).forEach(b => b.classList.remove('scsel'));
       btn.classList.add('scsel');
       if (v === 'N/A') STATE.answers[key] = null; else STATE.answers[key] = Number(v);
+      markFormDirty();
       updateScoreBar();
       return;
     }
@@ -80,6 +111,10 @@ function bindPanelEvents(root) {
       const t = kv.closest('[data-key]');
       if (t) STATE.basic[t.dataset.key] = kv.value;
     }
+    if (e.target.matches('input, textarea, select')) markFormDirty();
+  });
+  root.addEventListener('change', e => {
+    if (e.target.matches('input, select, textarea')) markFormDirty();
   });
 }
 
@@ -368,6 +403,7 @@ function areaTextField(key, label, value, type) {
 }
 
 async function showAreaEvaluation() {
+  if (!confirmDiscardChanges()) return;
   switchTab('tab-area');
   const wrap = $('#areaWrap');
   if (!SELECTED) {
@@ -402,10 +438,10 @@ async function showAreaEvaluation() {
       ${AREA_ITEMS.map((g,gi)=>`<div class="grp"><div class="grp-h">${esc(g.group)}</div><div class="area-question">คำถาม: ${gi===0?'โรงเรียนรู้หรือไม่ว่าต้องการพัฒนาผู้เรียนเรื่องใด และใช้ข้อมูลในการพัฒนาโรงเรียนจริงหรือไม่':gi===1?'หลักสูตรที่โรงเรียนกำหนดถูกนำไปใช้ในการจัดการเรียนรู้จริงหรือไม่':'ในชั้นเรียน ผู้เรียนได้คิด ลงมือทำ และเกิดการเรียนรู้หรือไม่'}</div><div class="area-items">${g.items.map((q,qi)=>{const n=g.items.slice(0,qi).length+AREA_ITEMS.slice(0,gi).reduce((s,x)=>s+x.items.length,0)+1;const v=(AREA_FORM_STATE.ratings||{})[n]||'';const note=(AREA_FORM_STATE.notes||{})[n]||'';return `<div class="area-item"><div class="area-q"><b>${n}.</b> ${esc(q)}</div><div class="area-score">${['2','1','0','N/A'].map(x=>`<label><input type="radio" name="area-score-${n}" value="${x}" data-area-score="${n}" ${v===x?'checked':''}> ${x}</label>`).join('')}</div><label class="area-field"><span>สิ่งที่พบ/หมายเหตุ</span><textarea data-area-note="${n}" rows="2" placeholder="บันทึกหลักฐานหรือข้อสังเกต">${esc(note)}</textarea></label>${n<=4?`<div class="area-evidence"><b>ตัวอย่างหลักฐาน:</b> แผนพัฒนาคุณภาพ แผนปฏิบัติการ ข้อมูลผู้เรียนและผลประเมิน SAR บันทึกนิเทศภายใน หรือการสนทนากับผู้บริหารและครู</div>`:''}</div>`}).join('')}</div></div>`).join('')}
       <div class="area-actions"><button class="btn btn-primary" onclick="saveAreaEvaluation()">💾 บันทึกแบบนิเทศทั่วไประดับพื้นที่</button></div>
     </div><div class="form-wrap"><div class="grp"><div class="grp-h">ประวัติแบบนิเทศทั่วไประดับพื้นที่</div><div id="areaHistory" class="loading">กำลังโหลดประวัติ...</div></div></div>`;
-  wrap.querySelectorAll('[data-area-field]').forEach(x=>x.addEventListener('input',()=>AREA_FORM_STATE[x.dataset.areaField]=x.value));
-  wrap.querySelectorAll('[data-area-type]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.formTypes=Array.from(wrap.querySelectorAll('[data-area-type]:checked')).map(c=>types[Number(c.dataset.areaType)])}));
-  wrap.querySelectorAll('[data-area-score]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.ratings=AREA_FORM_STATE.ratings||{};AREA_FORM_STATE.ratings[x.dataset.areaScore]=x.value}));
-  wrap.querySelectorAll('[data-area-note]').forEach(x=>x.addEventListener('input',()=>{AREA_FORM_STATE.notes=AREA_FORM_STATE.notes||{};AREA_FORM_STATE.notes[x.dataset.areaNote]=x.value}));
+  wrap.querySelectorAll('[data-area-field]').forEach(x=>x.addEventListener('input',()=>{AREA_FORM_STATE[x.dataset.areaField]=x.value; markFormDirty();}));
+  wrap.querySelectorAll('[data-area-type]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.formTypes=Array.from(wrap.querySelectorAll('[data-area-type]:checked')).map(c=>types[Number(c.dataset.areaType)]); markFormDirty();}));
+  wrap.querySelectorAll('[data-area-score]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.ratings=AREA_FORM_STATE.ratings||{};AREA_FORM_STATE.ratings[x.dataset.areaScore]=x.value; markFormDirty();}));
+  wrap.querySelectorAll('[data-area-note]').forEach(x=>x.addEventListener('input',()=>{AREA_FORM_STATE.notes=AREA_FORM_STATE.notes||{};AREA_FORM_STATE.notes[x.dataset.areaNote]=x.value; markFormDirty();}));
   const history = await post('getAreaEvaluations', SELECTED.id);
   const hw = $('#areaHistory');
   hw.innerHTML = history && history.success && history.data.length ? `<table class="tb"><thead><tr><th>วันที่บันทึก</th><th>วันที่นิเทศ</th><th>ผู้นิเทศ</th></tr></thead><tbody>${history.data.map(x=>`<tr><td>${esc(x.timestamp)}</td><td>${esc(x.evalDate||'—')}</td><td>${esc(x.supervisor||'—')}</td></tr>`).join('')}</tbody></table>` : `<div class="empty">ยังไม่มีประวัติแบบนิเทศนี้สำหรับสถานศึกษาที่เลือก</div>`;
@@ -416,7 +452,7 @@ async function saveAreaEvaluation() {
   const payload = { id: SELECTED.id, name: SELECTED.name, supervisor: CURRENT_USER ? CURRENT_USER.fname + ' (' + CURRENT_USER.username + ')' : '', details: AREA_FORM_STATE };
   if (!Object.keys(payload.details.ratings || {}).length) { toast('กรุณาให้คะแนนอย่างน้อย 1 ข้อ', false); return; }
   const res = await post('saveAreaEvaluation', payload);
-  if (res && res.success) { toast(res.message || 'บันทึกแบบนิเทศแล้ว', true); showAreaEvaluation(); }
+  if (res && res.success) { setFormClean(); toast(res.message || 'บันทึกแบบนิเทศแล้ว', true); showAreaEvaluation(); }
   else toast((res && res.message) || 'บันทึกไม่สำเร็จ', false);
 }
 
@@ -510,6 +546,7 @@ async function saveResult(editRow) {
     toast(res.message || 'บันทึกเรียบร้อยแล้ว', true);
     clearDraft();
     EDIT_ROW = null;
+    setFormClean();
     if (SELECTED) SELECTED = { ...SELECTED, ...payload.schoolData };
     showEvalHistory();
   } else {
@@ -615,6 +652,7 @@ async function deleteUpload(id) {
 // ประวัติการนิเทศ
 // ============================================================
 async function showEvalHistory() {
+  if (!confirmDiscardChanges()) return;
   switchTab('tab-hist');
   const wrap = $('#histWrap');
   if (!SELECTED) { wrap.innerHTML = `<div class="empty">กรุณาเลือกสถานศึกษา เพื่อดูประวัติการนิเทศ</div>`; return; }
@@ -736,6 +774,10 @@ async function loadHistoryRow(row) {
   switchTab('tab-1');
   updateScoreBar();
   applyAnswersToDom();
+  setFormClean();
+  EDIT_ROW = Number(row);
+  const cancelBtn = $('#cancelEditBtn');
+  if (cancelBtn) cancelBtn.style.display = 'block';
   toast('โหลดผลการนิเทศครั้งนี้เข้าฟอร์มแล้ว — แก้ไขแล้วกด "บันทึกผลการนิเทศ" เพื่ออัปเดต', true);
 }
 
