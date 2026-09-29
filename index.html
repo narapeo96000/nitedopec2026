@@ -60,6 +60,19 @@ a{color:var(--pri)}
 .landing .form-control{width:100%;min-height:46px;border-radius:12px;border:1.5px solid #d5e0ea;padding:10px 14px;font-size:1rem;font-family:inherit;color:#0f172a;background:#fff;box-sizing:border-box}
 .landing .form-control:focus{outline:none;border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.15)}
 .landing .auth-card{max-width:460px;margin:24px auto 0}
+.landing .home-login-card{border-top:5px solid #0f766e;background:linear-gradient(180deg,#f0fdfa 0%,#fff 42%)}
+.landing .home-login-card .sec-h{color:#0f766e}
+.landing #loginModeFull,.landing #loginModeGeneral{border-top:4px solid transparent}
+.landing #loginModeFull{border-top-color:#2563eb;background:#eff6ff}
+.landing #loginModeGeneral{border-top-color:#059669;background:#ecfdf5}
+.landing #loginModeFull.selected{border-color:#1d4ed8;background:#dbeafe;box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+.landing #loginModeGeneral.selected{border-color:#047857;background:#d1fae5;box-shadow:0 0 0 3px rgba(5,150,105,.18)}
+.landing .home-stats-card{border-top:5px solid #d97706;background:linear-gradient(180deg,#fffbeb 0%,#fff 35%)}
+.landing .home-stats-card .card-title h4{color:#92400e;border-left-color:#d97706}
+.landing .home-directory-card{border-top:5px solid #2563eb;background:linear-gradient(180deg,#eff6ff 0%,#fff 35%)}
+.landing .home-directory-card .card-title h4{color:#1e40af;border-left-color:#2563eb}
+.landing .home-docs-card{border-top:5px solid #7c3aed;background:linear-gradient(180deg,#f5f3ff 0%,#fff 35%)}
+.landing .home-docs-card .card-title h4{color:#6d28d9;border-left-color:#7c3aed}
 .landing .info-box{background:#f0fdfa;border:1px solid #ccfbf1;border-radius:12px;padding:10px 14px;margin-top:8px}
 .landing .oppts{color:#0f172a}
 /* buttons */
@@ -461,6 +474,13 @@ textarea.note{width:100%;resize:vertical}
   .landing thead th{background:#453a20;color:#fcd34d}
   .landing .latest-table thead th{background:#1e3a5f;color:#93c5fd}
   .landing .stat-card .val{color:#5eead4}
+  .landing .home-login-card{background:linear-gradient(180deg,#123b3a 0%,#1e293b 42%);border-top-color:#2dd4bf}
+  .landing .home-stats-card{background:linear-gradient(180deg,#3d3216 0%,#1e293b 35%);border-top-color:#f59e0b}
+  .landing .home-directory-card{background:linear-gradient(180deg,#172c4d 0%,#1e293b 35%);border-top-color:#60a5fa}
+  .landing .home-docs-card{background:linear-gradient(180deg,#2e1b54 0%,#1e293b 35%);border-top-color:#a78bfa}
+  .landing .home-stats-card .card-title h4{color:#fcd34d;border-left-color:#f59e0b}
+  .landing .home-directory-card .card-title h4{color:#93c5fd;border-left-color:#60a5fa}
+  .landing .home-docs-card .card-title h4{color:#c4b5fd;border-left-color:#a78bfa}
   .meta-box{background:#0f172a;border-color:#134e4a}
   .agree-tb th{background:#134e4a;color:#5eead4}
   .tb th{background:#134e4a;color:#5eead4}
