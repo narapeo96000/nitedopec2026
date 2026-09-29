@@ -91,7 +91,8 @@ const SUPPORT_OPTIONS = [
 ];
 const ROUNDS = [
   { v: "รอบที่ 1 (ภาคเรียนที่ 1)", note: "สำรวจสภาพปัจจุบัน กำหนดประเด็นพัฒนา / ตรวจเยี่ยมชั้นเรียน" },
-  { v: "รอบที่ 2 (ภาคเรียนที่ 2)", note: "ติดตามผลการเปลี่ยนแปลงจากข้อตกลงครั้งก่อน" }
+  { v: "รอบที่ 2 (ภาคเรียนที่ 2)", note: "ติดตามผลการเปลี่ยนแปลงจากข้อตกลงครั้งก่อน" },
+  { v: "รอบที่ 3 (เพิ่มเติม)", note: "ระบุรายละเอียดรอบการนิเทศเพิ่มเติม" }
 ];
 const SUMMARY_Q = [
   "ประเด็นที่เห็นจุดแข็ง/สิ่งที่ทำได้ดีที่สุด คืออะไร",
@@ -268,7 +269,7 @@ function restoreDraftIfAny() {
   STATE.multibasic = s.multibasic || {};
   STATE.multiVals = s.multiVals || {};
   STATE.basic = s.basic || {};
-  STATE.evalMeta = { formType: (s.evalMeta && s.evalMeta.formType) || ROUNDS[0].v, round: (s.evalMeta && s.evalMeta.round) || '' };
+  STATE.evalMeta = { formType: (s.evalMeta && s.evalMeta.formType) || ROUNDS[0].v, round: (s.evalMeta && s.evalMeta.round) || '', roundOther: (s.evalMeta && s.evalMeta.roundOther) || '' };
   const ft = STATE.evalMeta.formType;
   document.querySelectorAll(`input[name=formType][value="${esc(ft)}"]`).forEach(x => x.checked = true);
   applyAnswersToDom();
