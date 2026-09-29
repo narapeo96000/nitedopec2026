@@ -618,6 +618,11 @@ function getStatsSchool() {
 function uploadFolder() {
   return DriveApp.getFolderById(DRIVE_FOLDER_ID);
 }
+// เรียกใช้ครั้งเดียวจาก Apps Script Editor เพื่อขออนุมัติสิทธิ์ Google Drive
+function authorizeDriveAccess() {
+  const folder = uploadFolder();
+  return { success: true, folderId: folder.getId(), folderName: folder.getName() };
+}
 function schoolFolder(schoolId) {
   const base = uploadFolder();
   const it = base.getFoldersByName(schoolId);
