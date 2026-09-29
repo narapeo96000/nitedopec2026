@@ -1145,7 +1145,8 @@ function initPinBar(targetId) {
   const card = (targetId && $('#' + targetId)) || $('#basicPinCard') || $('#pinCard');
   if (!card) return;
   card.innerHTML = `<div class="pin-head"><b>📍 ที่ตั้งสถานศึกษา</b>
-    <button type="button" class="btn btn-mini" id="gpsBtn">📌 หาพิกัดปัจจุบัน</button></div>
+    <div class="pin-tools"><button type="button" class="btn btn-mini" id="gpsBtn">📌 หาพิกัดปัจจุบัน</button>
+    <a class="btn btn-mini route-btn" id="routeBtn" target="_blank" rel="noopener" style="display:none">🧭 เปิดเส้นทาง</a></div></div>
     <div id="map" class="map"></div>
     <div class="pin-coords"><input id="coords" placeholder="ละติจูด, ลองจิจูด" value="${esc(SELECTED_COORDS || '')}">
     <button type="button" class="btn btn-mini" id="setPin">บันทึกพิกัด</button></div>`;
@@ -1160,21 +1161,30 @@ function initPinBar(targetId) {
   }
   if (!MAP) {
     MAP = L.map('map').setView([6.4246, 101.8249], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, attribution: '&copy; OpenStreetMap'
-    }).addTo(MAP);
-    // ชั้นดาวเทียมเพิ่มเติม
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19, className: 'satellite-layer'
-    }).addTo(MAP);
+    });
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: 'Tiles &copy; Esri', className: 'satellite-layer'
+    });
+    satelliteLayer.addTo(MAP);
+    L.control.layers({ '🛰️ ดาวเทียม': satelliteLayer, '🗺️ แผนที่ถนน': roadLayer }, null, { collapsed: true }).addTo(MAP);
   }
   setTimeout(() => MAP.invalidateSize(), 300);
   const c = SELECTED_COORDS || SELECTED.coords || '';
+  const updateRouteLink = value => {
+    const route = $('#routeBtn');
+    const parts = String(value || '').split(',').map(v => parseFloat(v.trim()));
+    if (!route || parts.length !== 2 || parts.some(Number.isNaN)) return;
+    route.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(parts[0] + ',' + parts[1]);
+    route.style.display = 'inline-flex';
+  };
   if (c) {
     const [lat, lng] = c.split(',').map(parseFloat);
     if (!isNaN(lat) && !isNaN(lng)) {
       if (MAP_MARKER) MAP_MARKER.setLatLng([lat, lng]); else MAP_MARKER = L.marker([lat, lng]).addTo(MAP);
       MAP.setView([lat, lng], 15);
+      updateRouteLink(c);
     }
   }
   $('#gpsBtn').onclick = async () => {
@@ -1183,6 +1193,7 @@ function initPinBar(targetId) {
     navigator.geolocation.getCurrentPosition(p => {
       const lat = p.coords.latitude.toFixed(6), lng = p.coords.longitude.toFixed(6);
       $('#coords').value = lat + ', ' + lng;
+      updateRouteLink(lat + ', ' + lng);
       if (MAP_MARKER) MAP_MARKER.setLatLng([lat, lng]); else MAP_MARKER = L.marker([lat, lng]).addTo(MAP);
       MAP.setView([lat, lng], 15);
       toast('ได้พิกัดจาก GPS แล้ว (' + lat + ', ' + lng + ')', true);
@@ -1193,13 +1204,14 @@ function initPinBar(targetId) {
   MAP.on('click', e => {
     const lat = e.latlng.lat.toFixed(6), lng = e.latlng.lng.toFixed(6);
     $('#coords').value = lat + ', ' + lng;
+    updateRouteLink(lat + ', ' + lng);
     if (MAP_MARKER) MAP_MARKER.setLatLng(e.latlng); else MAP_MARKER = L.marker(e.latlng).addTo(MAP);
   });
   $('#setPin').onclick = async () => {
     const v = $('#coords').value.trim();
     if (!v) { toast('กรุณาระบุพิกัด', false); return; }
     const r = await post('saveSchoolPin', { id: SELECTED.id, coords: v });
-    if (r && r.success) { SELECTED_COORDS = v; SELECTED.coords = v; toast(r.message, true); }
+    if (r && r.success) { SELECTED_COORDS = v; SELECTED.coords = v; updateRouteLink(v); toast(r.message, true); }
     else toast((r||{}).message || 'บันทึกไม่สำเร็จ', false);
   };
 }
