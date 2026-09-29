@@ -47,7 +47,7 @@ function sumSc(prefix) {
 
 // ---------- ส่วนที่ 1 (ส่วนกลางทุกโรงเรียน ข้อ1-22) ----------
 function part1ItemsHtml() {
-  return PART1_GROUPS.map(g => {
+  return NUMBERED_PART1_GROUPS.map(g => {
     const vals = g.items.map(it => {
       const key = "part1:" + it.n;
       return `<div class="it" data-key="${key}">
@@ -216,7 +216,7 @@ function buildTab3() {
   root.innerHTML = `<div class="panel-head"><h2>📚 หลักสูตรและการจัดการเรียนรู้ (ด้าน 2-3)</h2>
     <div class="hint">ให้คะแนน <b>2/1/0/N-A</b> พร้อมบันทึกหลักฐาน</div></div>
   <div class="form-wrap">${
-    PART1_GROUPS.filter(g => g.items.some(i => keyRange.includes(i.n))).map(g =>
+    NUMBERED_PART1_GROUPS.filter(g => g.items.some(i => keyRange.includes(i.n))).map(g =>
       `<div class="grp"><div class="grp-h">${esc(g.group)}${g.items.some(i=>i.n>=5&&i.n<=8)?' (ข้อ 5-8)':'(ข้อ 9-14)'}</div>${
         g.items.filter(i=>keyRange.includes(i.n)).map(it=>{
           const key="part1:"+it.n;
@@ -239,7 +239,7 @@ function buildTab4() {
   root.innerHTML = `<div class="panel-head"><h2>📊 การวัดประเมินผลและผลที่เกิดขึ้นกับผู้เรียน (ด้าน 4-5)</h2>
     <div class="hint">ให้คะแนน <b>2/1/0/N-A</b> + ส่วนที่ 4 การสุ่มตรวจผลการเรียนรู้ของผู้เรียน (พบชัดเจน/พบบางส่วน/ควรพัฒนา)</div></div>
   <div class="form-wrap">
-    ${PART1_GROUPS.filter(g=>g.items.some(i=>k1.includes(i.n))).map(g=>`
+    ${NUMBERED_PART1_GROUPS.filter(g=>g.items.some(i=>k1.includes(i.n))).map(g=>`
       <div class="grp"><div class="grp-h">${esc(g.group)} (ข้อ ${Math.min(...g.items.map(i=>i.n))}-${Math.max(...g.items.map(i=>i.n))})</div>
       ${g.items.filter(i=>k1.includes(i.n)).map(it=>{const key="part1:"+it.n;return `
         <div class="it"><div class="i-head"><span class="i-n">${String(it.n).padStart(2,'0')}</span><b>${esc(it.t)}</b></div>

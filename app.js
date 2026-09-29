@@ -60,6 +60,13 @@ const PART1_GROUPS = [
 ];
 const ALL_PART1 = [].concat(D1, D2, D3, D4, D5).map((x, i) => ({ ...x, n: i + 1 }));
 const ALL_PART2 = [].concat(D6, D7).map((x, i) => ({ ...x, n: i + 23 }));
+const NUMBERED_PART1_GROUPS = [
+  { group: PART1_GROUPS[0].group, items: ALL_PART1.slice(0, 4) },
+  { group: PART1_GROUPS[1].group, items: ALL_PART1.slice(4, 8) },
+  { group: PART1_GROUPS[2].group, items: ALL_PART1.slice(8, 14) },
+  { group: PART1_GROUPS[3].group, items: ALL_PART1.slice(14, 18) },
+  { group: PART1_GROUPS[4].group, items: ALL_PART1.slice(18, 22) }
+];
 const CLASS3_ITEMS = [
   { t: "ผู้เรียนเข้าใจจุดประสงค์และเป้าหมายของการเรียนรู้", h: "เข้าใจเป้าหมายการเรียนรู้" },
   { t: "ผู้เรียนมีส่วนร่วมในกิจกรรมการเรียนรู้อย่างทั่วถึง", h: "ผู้เรียนมีส่วนร่วมทั่วถึง" },
