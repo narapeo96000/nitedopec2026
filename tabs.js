@@ -462,6 +462,7 @@ async function showAreaEvaluation() {
         ${areaTextField('schoolName','ชื่อโรงเรียน',form.name)}
         ${areaTextField('district','อำเภอ',form.dist)}
         <div class="area-field"><span>รูปแบบการจัดการศึกษา มี 3 รูปแบบ</span><div class="area-checks">${types.map((t,i)=>`<label><input type="checkbox" data-area-type="${i}" ${checks.includes(t.value) || (!checks.length && isDefaultType(t.value))?'checked':''}> ${esc(t.label)}</label>`).join('')}</div></div>
+        <div class="area-field"><span>ปักหมุด พิกัดแผนที่</span><div id="areaPinCard"></div></div>
         ${areaTextField('gradeLevels','ระดับชั้นที่เปิดสอน','')}
         ${areaTextField('studentCount','จำนวนนักเรียน','')}
         ${areaTextField('teacherCount','จำนวนครู','')}
@@ -476,6 +477,7 @@ async function showAreaEvaluation() {
       ${AREA_ITEMS.map((g,gi)=>`<div class="grp"><div class="grp-h">${esc(g.group)}</div><div class="area-question">คำถาม: ${gi===0?'โรงเรียนรู้หรือไม่ว่าต้องการพัฒนาผู้เรียนเรื่องใด และใช้ข้อมูลในการพัฒนาโรงเรียนจริงหรือไม่':gi===1?'หลักสูตรที่โรงเรียนกำหนดถูกนำไปใช้ในการจัดการเรียนรู้จริงหรือไม่':'ในชั้นเรียน ผู้เรียนได้คิด ลงมือทำ และเกิดการเรียนรู้หรือไม่'}</div><div class="area-items">${g.items.map((q,qi)=>{const n=g.items.slice(0,qi).length+AREA_ITEMS.slice(0,gi).reduce((s,x)=>s+x.items.length,0)+1;const v=(AREA_FORM_STATE.ratings||{})[n]||'';const note=(AREA_FORM_STATE.notes||{})[n]||'';return `<div class="area-item"><div class="area-q"><b>${n}.</b> ${esc(q)}</div><div class="area-score">${['2','1','0','N/A'].map(x=>`<label><input type="radio" name="area-score-${n}" value="${x}" data-area-score="${n}" ${v===x?'checked':''}> ${x}</label>`).join('')}</div><label class="area-field"><span>สิ่งที่พบ/หมายเหตุ</span><textarea data-area-note="${n}" rows="2" placeholder="บันทึกหลักฐานหรือข้อสังเกต">${esc(note)}</textarea></label>${n<=4?`<div class="area-evidence"><b>ตัวอย่างหลักฐาน:</b> แผนพัฒนาคุณภาพ แผนปฏิบัติการ ข้อมูลผู้เรียนและผลประเมิน SAR บันทึกนิเทศภายใน หรือการสนทนากับผู้บริหารและครู</div>`:''}</div>`}).join('')}</div></div>`).join('')}
       <div class="area-actions"><button class="btn btn-primary" onclick="saveAreaEvaluation()">💾 บันทึกแบบนิเทศทั่วไประดับพื้นที่</button></div>
     </div><div class="form-wrap"><div class="grp"><div class="grp-h">ประวัติแบบนิเทศทั่วไประดับพื้นที่</div><div id="areaHistory" class="loading">กำลังโหลดประวัติ...</div></div></div>`;
+  initPinBar('areaPinCard');
   wrap.querySelectorAll('[data-area-field]').forEach(x=>x.addEventListener('input',()=>{AREA_FORM_STATE[x.dataset.areaField]=x.value; markFormDirty();}));
   wrap.querySelectorAll('[data-area-type]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.formTypes=Array.from(wrap.querySelectorAll('[data-area-type]:checked')).map(c=>types[Number(c.dataset.areaType)].value); markFormDirty();}));
   wrap.querySelectorAll('[data-area-score]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.ratings=AREA_FORM_STATE.ratings||{};AREA_FORM_STATE.ratings[x.dataset.areaScore]=x.value; markFormDirty();}));
