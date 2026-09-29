@@ -1021,7 +1021,7 @@ function selectInspectionSchool(id) {
   INSPECTION_SCHOOL_PENDING = id;
   const sel = $('#schoolSelect');
   if (sel) sel.value = id;
-  renderInspectionSchoolStep();
+  nextToInspectionRecording();
 }
 
 function nextToInspectionRecording() {
