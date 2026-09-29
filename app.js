@@ -219,6 +219,7 @@ let CURRENT_USER = null;
 let SCHOOLS = [];
 let SELECTED = null;        // ข้อมูลโรงเรียนที่เลือก (จาก getSchoolData)
 let INSPECTION_MODE = '';
+let INSPECTION_SCHOOL_PENDING = '';
 let SELECTED_COORDS = '';
 let MAP = null;
 let MAP_MARKER = null;
@@ -655,6 +656,7 @@ function logout() {
   if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
   CURRENT_USER = null;
   INSPECTION_MODE = '';
+  INSPECTION_SCHOOL_PENDING = '';
   SCHOOLS = []; SELECTED = null; STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
   if (typeof setFormClean === 'function') setFormClean();
   if (AUTO_SAVE_INTERVAL) clearInterval(AUTO_SAVE_INTERVAL);
@@ -688,6 +690,8 @@ async function startDash() {
         <div class="side-actions">
           <button class="btn" id="saveFullBtn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
           <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
+          <button class="btn btn-mini" id="inspectionNextBtn" onclick="nextInspectionSection()" style="margin-top:6px">ถัดไป</button>
+          <button class="btn btn-mini" onclick="backToInspectionMode()" style="margin-top:6px">กลับหน้าแรก</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
       </div>
@@ -769,6 +773,8 @@ async function startDashWithSchool(schoolId) {
         <div class="side-actions">
           <button class="btn" id="saveFullBtn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
           <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
+          <button class="btn btn-mini" id="inspectionNextBtn" onclick="nextInspectionSection()" style="margin-top:6px">ถัดไป</button>
+          <button class="btn btn-mini" onclick="backToInspectionMode()" style="margin-top:6px">กลับหน้าแรก</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
       </div>
@@ -979,43 +985,72 @@ function startInspection() {
       </div>
       <div id="inspectionModeHint" class="hint">กรุณาเลือกประเภทการนิเทศก่อนเลือกสถานศึกษา</div>
     </div>
-    <div class="dash-section">
-      <div class="school-pick-grid">
-        ${SCHOOLS.map(s => `
-          <div class="school-pick-card" onclick="pickSchool('${esc(s.id)}')">
-            <div class="school-pick-icon">🏫</div>
-            <div class="school-pick-name">${esc(s.name)}</div>
-            <div class="school-pick-dist">${esc(s.dist || '-')} · ${esc(s.subdist || '-')}</div>
-            <div class="school-pick-form">${esc(s.form || '-')}</div>
-          </div>
-        `).join('')}
-        ${!SCHOOLS.length ? '<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ</div>' : ''}
-      </div>
-    </div>
+    <div id="inspectionSchoolStep"></div>
   `;
   // sync sidebar dropdown
   const sel = $('#schoolSelect');
   if (sel) sel.value = '';
 }
 
-function startInspectionSchool(id) {
+function renderInspectionSchoolStep() {
+  const root = el('inspectionSchoolStep');
+  if (!root) return;
+  root.innerHTML = `<div class="dash-section">
+    <h3>เลือกสถานศึกษา</h3>
+    <p class="hint">เลือกสถานศึกษา แล้วกด “ถัดไป” เพื่อเข้าสู่การบันทึก</p>
+    <div class="school-pick-grid">
+      ${SCHOOLS.map(s => `
+        <div class="school-pick-card ${INSPECTION_SCHOOL_PENDING === s.id ? 'selected' : ''}" onclick="selectInspectionSchool('${esc(s.id)}')">
+          <div class="school-pick-icon">🏫</div>
+          <div class="school-pick-name">${esc(s.name)}</div>
+          <div class="school-pick-dist">${esc(s.dist || '-')} · ${esc(s.subdist || '-')}</div>
+          <div class="school-pick-form">${esc(s.form || '-')}</div>
+        </div>
+      `).join('')}
+      ${!SCHOOLS.length ? '<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ</div>' : ''}
+    </div>
+    <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+      <button class="btn btn-primary" type="button" onclick="nextToInspectionRecording()" ${INSPECTION_SCHOOL_PENDING ? '' : 'disabled'}>ถัดไป</button>
+      <button class="btn" type="button" onclick="backToInspectionMode()">กลับหน้าแรก</button>
+    </div>
+  </div>`;
+}
+
+function selectInspectionSchool(id) {
   if (!INSPECTION_MODE) { toast('กรุณาเลือกประเภทการนิเทศก่อน', false); return; }
+  INSPECTION_SCHOOL_PENDING = id;
   const sel = $('#schoolSelect');
   if (sel) sel.value = id;
-  loadSchool(id);
+  renderInspectionSchoolStep();
+}
+
+function nextToInspectionRecording() {
+  if (!INSPECTION_SCHOOL_PENDING) { toast('กรุณาเลือกสถานศึกษาก่อน', false); return; }
+  loadSchool(INSPECTION_SCHOOL_PENDING);
+}
+
+function backToInspectionMode() {
+  INSPECTION_SCHOOL_PENDING = '';
+  startInspection();
+}
+
+function startInspectionSchool(id) {
+  if (!INSPECTION_MODE) { startInspection(); toast('กรุณาเลือกประเภทการนิเทศก่อน', false); return; }
+  selectInspectionSchool(id);
 }
 
 function pickSchool(id) {
-  if (!INSPECTION_MODE) { toast('กรุณาเลือกประเภทการนิเทศก่อน', false); return; }
   startInspectionSchool(id);
 }
 
 function chooseInspectionMode(mode) {
   INSPECTION_MODE = mode === 'general' ? 'general' : 'full';
+  INSPECTION_SCHOOL_PENDING = '';
   const hint = $('#inspectionModeHint');
   if (hint) hint.textContent = INSPECTION_MODE === 'general'
     ? 'เลือกสถานศึกษาเพื่อเปิดแบบนิเทศทั่วไปเท่านั้น'
     : 'เลือกสถานศึกษาเพื่อเปิดแบบนิเทศเต็มรูปแบบทุกด้าน';
+  renderInspectionSchoolStep();
 }
 
 function applyInspectionModeUI() {
@@ -1026,6 +1061,16 @@ function applyInspectionModeUI() {
   });
   const saveFull = $('#saveFullBtn');
   if (saveFull) saveFull.style.display = generalOnly ? 'none' : '';
+}
+
+function nextInspectionSection() {
+  if (INSPECTION_MODE === 'general') {
+    showAreaEvaluation();
+    return;
+  }
+  const tabs = ['tab-1','tab-2','tab-3','tab-4','tab-5','tab-6','tab-7'];
+  const active = tabs.findIndex(id => el(id) && el(id).classList.contains('active'));
+  switchTab(tabs[Math.min(active < 0 ? 0 : active + 1, tabs.length - 1)]);
 }
 
 function resumeDraft(schoolName) {
