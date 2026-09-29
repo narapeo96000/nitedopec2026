@@ -321,8 +321,8 @@ function showLogin() {
           <span class="org">สำนักงานการศึกษาเอกชนจังหวัดนราธิวาส</span>
         </div>
         <div class="highlight">
-          <div class="hl-tag">✨ นิเทศโรงเรียนเอกชนยุคใหม่ ✨</div>
-          <div class="hl-big">นิเทศยุคใหม่ เข้าใจ เข้าถึง พัฒนาคุณภาพผู้เรียน</div>
+          <div class="hl-tag">✨โรงเรียนเอกชนยุคใหม่ ✨</div>
+          <div class="hl-big">เข้าใจ เข้าถึง พัฒนาคุณภาพผู้เรียน</div>
         </div>
         <div class="version-badge">📱 รุ่นพร้อมใช้งานภาคสนาม (Mobile Optimized)</div>
       </div>
