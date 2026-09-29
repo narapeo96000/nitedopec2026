@@ -485,6 +485,9 @@ function loginPickInspectionMode(mode) {
     ? 'เลือกนิเทศทั่วไป: บันทึกเฉพาะแบบนิเทศทั่วไประดับพื้นที่'
     : 'เลือกนิเทศเต็มรูปแบบ: บันทึกข้อมูลครบทุกด้าน';
 }
+function inspectionModeText(mode) {
+  return mode === 'general' ? 'นิเทศทั่วไป' : 'นิเทศเต็มรูปแบบ';
+}
 function renderDir() {
   const body = $('#dirBody');
   if (!body) return;
@@ -695,12 +698,12 @@ function logout() {
 async function startDash() {
   const app = $('#app');
   app.innerHTML = `
-  <div class="topbar">
+    <div class="topbar">
     <div style="display:flex;align-items:center;gap:8px">
       <button class="hamburger" onclick="toggleSidebar()" id="hamburgerBtn">☰</button>
       <div class="tb-brand">🏫 <b>${APP_NAME}</b></div>
     </div>
-    <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small>
+    <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small><small class="role mode-role">${esc(inspectionModeText(INSPECTION_MODE))}</small>
       <button class="btn btn-mini" onclick="logout()">ออกจากระบบ</button>
     </div>
   </div>
@@ -778,12 +781,12 @@ async function startDash() {
 async function startDashWithSchool(schoolId) {
   const app = $('#app');
   app.innerHTML = `
-  <div class="topbar">
+    <div class="topbar">
     <div style="display:flex;align-items:center;gap:8px">
       <button class="hamburger" onclick="toggleSidebar()" id="hamburgerBtn">☰</button>
       <div class="tb-brand">🏫 <b>${APP_NAME}</b></div>
     </div>
-    <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small>
+    <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small><small class="role mode-role">${esc(inspectionModeText(INSPECTION_MODE))}</small>
       <button class="btn btn-mini" onclick="logout()">ออกจากระบบ</button>
     </div>
   </div>
@@ -995,7 +998,7 @@ function startInspection() {
     <div class="dash-hero">
       <div class="dash-hero-text">
         <h1>🚀 เริ่มการนิเทศ</h1>
-        <p>เลือกโหมดการนิเทศก่อนเลือกสถานศึกษา</p>
+        <p>ขั้นตอนที่ 1 จาก 2 · เลือกโหมดการนิเทศก่อนเลือกสถานศึกษา</p>
       </div>
     </div>
     <div class="dash-section">
@@ -1023,7 +1026,7 @@ function renderInspectionSchoolStep() {
   if (!root) return;
   root.innerHTML = `<div class="dash-section">
     <h3>เลือกสถานศึกษา</h3>
-    <p class="hint">เลือกสถานศึกษา แล้วกด “ถัดไป” เพื่อเข้าสู่การบันทึก</p>
+    <p class="hint">ขั้นตอนที่ 2 จาก 2 · แตะสถานศึกษา ระบบจะเปิดแบบบันทึกให้อัตโนมัติ</p>
     <div class="school-pick-grid">
       ${SCHOOLS.map(s => `
         <div class="school-pick-card ${INSPECTION_SCHOOL_PENDING === s.id ? 'selected' : ''}" onclick="selectInspectionSchool('${esc(s.id)}')">
@@ -1088,6 +1091,8 @@ function applyInspectionModeUI() {
   });
   const saveFull = $('#saveFullBtn');
   if (saveFull) saveFull.style.display = generalOnly ? 'none' : '';
+  const nextBtn = $('#inspectionNextBtn');
+  if (nextBtn) nextBtn.style.display = generalOnly ? 'none' : '';
 }
 
 function nextInspectionSection() {
