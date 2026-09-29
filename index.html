@@ -168,6 +168,15 @@ a{color:var(--pri)}
 .tb-nav{text-align:left;background:none;border:none;border-radius:8px;padding:9px 12px;font-size:14px;color:#334155}
 .tb-nav:hover{background:#f0fdfa}
 .tb-nav.active{background:var(--pri);color:#fff}
+/* แยกกลุ่มเมนูด้วยสีเพื่อให้เลือกได้เร็ว */
+.tb-nav:not(.active)[data-target^="tab-"]{border-left:3px solid transparent}
+.tb-nav:not(.active)[data-target="tab-1"],.tb-nav:not(.active)[data-target="tab-2"],.tb-nav:not(.active)[data-target="tab-3"],.tb-nav:not(.active)[data-target="tab-4"],.tb-nav:not(.active)[data-target="tab-5"],.tb-nav:not(.active)[data-target="tab-6"],.tb-nav:not(.active)[data-target="tab-7"]{background:#eff6ff;color:#1e40af;border-left-color:#3b82f6}
+.tb-nav:not(.active)[data-target="tab-area"]{background:#ecfdf5;color:#047857;border-left-color:#10b981}
+.tb-nav:not(.active)[data-target="tab-files"]{background:#fffbeb;color:#b45309;border-left-color:#f59e0b}
+.tb-nav:not(.active)[data-target="tab-hist"],.tb-nav:not(.active)[data-target="tab-stats"]{background:#f5f3ff;color:#6d28d9;border-left-color:#8b5cf6}
+.tb-nav:not(.active)[data-target="tab-users"]{background:#fff1f2;color:#be123c;border-left-color:#f43f5e}
+.tb-nav:not(.active)[data-target="tab-info"]{background:#f8fafc;color:#475569;border-left-color:#94a3b8}
+.tb-nav:not(.active)[data-target^="tab-"]:hover{filter:brightness(.97);border-left-width:5px}
 .nav-sep{border-top:1px solid var(--bord);margin:6px 0}
 .content{flex:1;padding:16px 20px;min-width:0}
 #scoreBar{margin-bottom:10px}
@@ -420,6 +429,12 @@ textarea.note{width:100%;resize:vertical}
   .side{background:#1e293b;border-color:#334155}
   .tb-nav{color:#e2e8f0}
   .tb-nav:hover{background:#334155}
+  .tb-nav:not(.active)[data-target="tab-1"],.tb-nav:not(.active)[data-target="tab-2"],.tb-nav:not(.active)[data-target="tab-3"],.tb-nav:not(.active)[data-target="tab-4"],.tb-nav:not(.active)[data-target="tab-5"],.tb-nav:not(.active)[data-target="tab-6"],.tb-nav:not(.active)[data-target="tab-7"]{background:#172554;color:#bfdbfe}
+  .tb-nav:not(.active)[data-target="tab-area"]{background:#064e3b;color:#a7f3d0}
+  .tb-nav:not(.active)[data-target="tab-files"]{background:#451a03;color:#fde68a}
+  .tb-nav:not(.active)[data-target="tab-hist"],.tb-nav:not(.active)[data-target="tab-stats"]{background:#2e1065;color:#ddd6fe}
+  .tb-nav:not(.active)[data-target="tab-users"]{background:#4c0519;color:#fecdd3}
+  .tb-nav:not(.active)[data-target="tab-info"]{background:#1e293b;color:#cbd5e1}
   .card,.form-wrap,.hist-card,.stat-card,.help-card{background:#1e293b;border-color:#334155;color:#e2e8f0}
   .grp-h{background:#0f172a;color:#5eead4}
   .it{border-color:#334155}
