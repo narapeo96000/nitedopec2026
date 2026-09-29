@@ -576,6 +576,10 @@ function collectResult() {
 }
 
 async function saveResult(editRow) {
+  if (typeof INSPECTION_MODE !== 'undefined' && INSPECTION_MODE === 'general') {
+    toast('โหมดนิเทศทั่วไปให้บันทึกผ่านแบบนิเทศทั่วไประดับพื้นที่เท่านั้น', false);
+    return;
+  }
   const payload = collectResult();
   if (!payload) { toast("กรุณาเลือกสถานศึกษาก่อน", false); return; }
   if (payload.evalData.s1 === 0 && Object.keys(STATE.answers).length === 0) {

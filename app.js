@@ -218,6 +218,7 @@ function compressImage(file, maxW = 1600, quality = 0.7) {
 let CURRENT_USER = null;
 let SCHOOLS = [];
 let SELECTED = null;        // ข้อมูลโรงเรียนที่เลือก (จาก getSchoolData)
+let INSPECTION_MODE = '';
 let SELECTED_COORDS = '';
 let MAP = null;
 let MAP_MARKER = null;
@@ -653,6 +654,7 @@ async function doRegister(e) {
 function logout() {
   if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
   CURRENT_USER = null;
+  INSPECTION_MODE = '';
   SCHOOLS = []; SELECTED = null; STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
   if (typeof setFormClean === 'function') setFormClean();
   if (AUTO_SAVE_INTERVAL) clearInterval(AUTO_SAVE_INTERVAL);
@@ -684,7 +686,7 @@ async function startDash() {
         <select id="schoolSelect" onchange="loadSchool(this.value)"><option value="">— เลือกสถานศึกษา —</option></select>
         <div id="pinCard"></div>
         <div class="side-actions">
-          <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn" id="saveFullBtn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
           <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
@@ -765,7 +767,7 @@ async function startDashWithSchool(schoolId) {
         <select id="schoolSelect" onchange="loadSchool(this.value)"><option value="">— เลือกสถานศึกษา —</option></select>
         <div id="pinCard"></div>
         <div class="side-actions">
-          <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn" id="saveFullBtn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
           <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
@@ -955,14 +957,27 @@ async function showDashboard() {
 // ============================================================
 function startInspection() {
   if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
-  // แสดง dropdown เลือกสถานศึกษาแบบเต็มหน้าจอ
+  INSPECTION_MODE = '';
+  // แสดงขั้นตอนเลือกโหมดก่อนเลือกสถานศึกษา
   const root = el('tab-1');
   root.innerHTML = `
     <div class="dash-hero">
       <div class="dash-hero-text">
         <h1>🚀 เริ่มการนิเทศ</h1>
-        <p>เลือกสถานศึกษาที่ต้องการเข้าปฏิบัติงานภาคสนาม</p>
+        <p>เลือกโหมดการนิเทศก่อนเลือกสถานศึกษา</p>
       </div>
+    </div>
+    <div class="dash-section">
+      <h3>เลือกประเภทการนิเทศ</h3>
+      <div class="dash-stats">
+        <button class="dash-stat-card" type="button" onclick="chooseInspectionMode('full')">
+          <div class="dash-stat-icon">📋</div><div class="dash-stat-label">นิเทศเต็มรูปแบบ</div><small>บันทึกข้อมูลครบทุกด้าน</small>
+        </button>
+        <button class="dash-stat-card" type="button" onclick="chooseInspectionMode('general')">
+          <div class="dash-stat-icon">🧭</div><div class="dash-stat-label">นิเทศทั่วไป</div><small>บันทึกเฉพาะแบบนิเทศทั่วไประดับพื้นที่</small>
+        </button>
+      </div>
+      <div id="inspectionModeHint" class="hint">กรุณาเลือกประเภทการนิเทศก่อนเลือกสถานศึกษา</div>
     </div>
     <div class="dash-section">
       <div class="school-pick-grid">
@@ -984,13 +999,33 @@ function startInspection() {
 }
 
 function startInspectionSchool(id) {
+  if (!INSPECTION_MODE) { toast('กรุณาเลือกประเภทการนิเทศก่อน', false); return; }
   const sel = $('#schoolSelect');
   if (sel) sel.value = id;
   loadSchool(id);
 }
 
 function pickSchool(id) {
+  if (!INSPECTION_MODE) { toast('กรุณาเลือกประเภทการนิเทศก่อน', false); return; }
   startInspectionSchool(id);
+}
+
+function chooseInspectionMode(mode) {
+  INSPECTION_MODE = mode === 'general' ? 'general' : 'full';
+  const hint = $('#inspectionModeHint');
+  if (hint) hint.textContent = INSPECTION_MODE === 'general'
+    ? 'เลือกสถานศึกษาเพื่อเปิดแบบนิเทศทั่วไปเท่านั้น'
+    : 'เลือกสถานศึกษาเพื่อเปิดแบบนิเทศเต็มรูปแบบทุกด้าน';
+}
+
+function applyInspectionModeUI() {
+  const generalOnly = INSPECTION_MODE === 'general';
+  const fullTabs = ['tab-1','tab-2','tab-3','tab-4','tab-5','tab-6','tab-7','tab-files','tab-hist','tab-stats','tab-users'];
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    if (fullTabs.includes(btn.dataset.target)) btn.style.display = generalOnly ? 'none' : '';
+  });
+  const saveFull = $('#saveFullBtn');
+  if (saveFull) saveFull.style.display = generalOnly ? 'none' : '';
 }
 
 function resumeDraft(schoolName) {
@@ -1017,8 +1052,10 @@ async function loadSchool(id, options = {}) {
   buildAll();
   if (typeof setFormClean === 'function') setFormClean();
   switchTab('tab-1');
+  applyInspectionModeUI();
   startAutoSave();
-  if (!options.skipDraft) restoreDraftIfAny();
+  if (!options.skipDraft && INSPECTION_MODE !== 'general') restoreDraftIfAny();
+  if (INSPECTION_MODE === 'general') showAreaEvaluation();
   toast('เลือก ' + SELECTED.name + ' แล้ว', true);
 }
 
