@@ -1,5 +1,5 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbzOIsAXOkPAL44dOA8KFxZE7WI3TCtS0ceyswLovl3xpzIfZn6O3wr8lou7FLeHw4Ym3Q/exec";
-const APP_NAME = "ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส";
+const APP_NAME = "ระบบนิเทศออนไลน์ โรงเรียนเอกชน จ.นราธิวาส";
 const MANUAL_NAME = "แผนนิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียนโรงเรียนเอกชนในระบบ จ.นราธิวาส";
 
 // -------------------------------------------------------------
@@ -60,6 +60,13 @@ const PART1_GROUPS = [
 ];
 const ALL_PART1 = [].concat(D1, D2, D3, D4, D5).map((x, i) => ({ ...x, n: i + 1 }));
 const ALL_PART2 = [].concat(D6, D7).map((x, i) => ({ ...x, n: i + 23 }));
+const NUMBERED_PART1_GROUPS = [
+  { group: PART1_GROUPS[0].group, items: ALL_PART1.slice(0, 4) },
+  { group: PART1_GROUPS[1].group, items: ALL_PART1.slice(4, 8) },
+  { group: PART1_GROUPS[2].group, items: ALL_PART1.slice(8, 14) },
+  { group: PART1_GROUPS[3].group, items: ALL_PART1.slice(14, 18) },
+  { group: PART1_GROUPS[4].group, items: ALL_PART1.slice(18, 22) }
+];
 const CLASS3_ITEMS = [
   { t: "ผู้เรียนเข้าใจจุดประสงค์และเป้าหมายของการเรียนรู้", h: "เข้าใจเป้าหมายการเรียนรู้" },
   { t: "ผู้เรียนมีส่วนร่วมในกิจกรรมการเรียนรู้อย่างทั่วถึง", h: "ผู้เรียนมีส่วนร่วมทั่วถึง" },
@@ -125,8 +132,42 @@ function getColor(pct) {
   return "#dc2626";
 }
 
+const API_STATUS_TITLES = {
+  getSchoolList: 'กำลังเรียกใช้ข้อมูล',
+  getSchoolData: 'กำลังเรียกใช้ข้อมูล',
+  getSchoolEvaluations: 'กำลังเรียกใช้ข้อมูล',
+  getAreaEvaluations: 'กำลังเรียกใช้ข้อมูล',
+  getStatsSchool: 'กำลังเรียกใช้ข้อมูล',
+  getStatsPublic: 'กำลังเรียกใช้ข้อมูล',
+  getSchoolListPublic: 'กำลังเรียกใช้ข้อมูล',
+  getUploads: 'กำลังเรียกใช้ข้อมูล',
+  getUsers: 'กำลังเรียกใช้ข้อมูล',
+  saveSchoolEvaluation: 'กำลังบันทึกข้อมูล',
+  saveAreaEvaluation: 'กำลังบันทึกข้อมูล',
+  saveSchoolPin: 'กำลังบันทึกข้อมูล',
+  setUserStatus: 'กำลังบันทึกข้อมูล',
+  uploadFile: 'กำลังอัปโหลดเอกสาร',
+  deleteUpload: 'กำลังบันทึกข้อมูล',
+  deleteSchoolEvaluation: 'กำลังบันทึกข้อมูล'
+};
+
+function openApiStatus(action) {
+  const title = API_STATUS_TITLES[action];
+  if (!title || !window.Swal || Swal.isVisible()) return false;
+  Swal.fire({
+    title,
+    text: 'กรุณารอสักครู่',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    didOpen: () => Swal.showLoading()
+  });
+  return true;
+}
+
 // --- Network retry (3 ครั้ง + exponential backoff) ---
 async function post(action, payload, retries = 3) {
+  const statusOpened = openApiStatus(action);
   for (let i = 0; i < retries; i++) {
     try {
       const r = await fetch(API_URL, {
@@ -134,9 +175,12 @@ async function post(action, payload, retries = 3) {
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({ action, payload })
       });
-      return await r.json();
+      const result = await r.json();
+      if (statusOpened && window.Swal) Swal.close();
+      return result;
     } catch (e) {
       if (i === retries - 1) {
+        if (statusOpened && window.Swal) Swal.close();
         return { success: false, message: "เชื่อมต่อระบบล้มเหลว โปรดตรวจอินเทอร์เน็ตแล้วลองใหม่ (" + e.message + ")" };
       }
       await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
@@ -229,6 +273,7 @@ function restoreDraftIfAny() {
   document.querySelectorAll(`input[name=formType][value="${esc(ft)}"]`).forEach(x => x.checked = true);
   applyAnswersToDom();
   updateScoreBar();
+  if (typeof markFormDirty === 'function') markFormDirty();
   toast('กู้คืนข้อมูลร่างเรียบร้อย', true);
 }
 
@@ -245,6 +290,7 @@ const REMEMBER_KEY = "opec_login";
 
 let CAPTCHA_A = 0, CAPTCHA_B = 0, CAPTCHA_OP = '+';
 let LOGIN_SCHOOL_ID = '';
+let LOGIN_BUSY = false;
 
 function genCaptcha() {
   CAPTCHA_A = Math.floor(Math.random() * 20) + 1;
@@ -260,13 +306,14 @@ function checkCaptcha() {
 
 function showLogin() {
   LOGIN_SCHOOL_ID = '';
+  LOGIN_BUSY = false;
   const app = $('#app');
   app.innerHTML = `
   <div class="landing">
     <div class="container">
       <div class="brand">
         <div class="logo">🏫</div>
-        <h1>ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส</h1>
+        <h1>ระบบนิเทศออนไลน์ โรงเรียนเอกชน จ.นราธิวาส</h1>
         <p class="sub-title">นิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียนโรงเรียนเอกชนในระบบ<br>(แบบสอนสามัญ · แบบสอนสามัญควบคู่ศาสนาอิสลาม)</p>
         <div class="org-line">
           <span class="org">สำนักงานจังหวัดนราธิวาส</span> |
@@ -274,8 +321,8 @@ function showLogin() {
           <span class="org">สำนักงานการศึกษาเอกชนจังหวัดนราธิวาส</span>
         </div>
         <div class="highlight">
-          <div class="hl-tag">✨ นิเทศโรงเรียนเอกชนยุคใหม่ ✨</div>
-          <div class="hl-big">นิเทศยุคใหม่ เข้าใจ เข้าถึง พัฒนาคุณภาพผู้เรียน</div>
+          <div class="hl-tag">✨โรงเรียนเอกชนยุคใหม่ ✨</div>
+          <div class="hl-big">เข้าใจ เข้าถึง พัฒนาคุณภาพผู้เรียน</div>
         </div>
         <div class="version-badge">📱 รุ่นพร้อมใช้งานภาคสนาม (Mobile Optimized)</div>
       </div>
@@ -300,7 +347,7 @@ function showLogin() {
         <div id="lgSelInfo" class="info-box d-none">
           <b id="lgSelName"></b><br><span id="lgSelDetail" class="small text-muted"></span>
         </div>
-        <button class="btn btn-primary w-100 mt-3" onclick="doLogin(event)">เข้าสู่ระบบ</button>
+        <button class="btn btn-primary w-100 mt-3" id="loginBtn" onclick="doLogin(event)">เข้าสู่ระบบ</button>
         <p class="text-center mt-3 mb-0 small">ยังไม่มีบัญชี? <a href="javascript:void(0)" class="login-link" onclick="showRegister()">สมัครสมาชิก</a></p>
       </div>
 
@@ -507,7 +554,7 @@ function showRegister() {
         <div class="brand" style="margin:0 0 6px;">
           <div class="logo" style="width:64px;height:64px;font-size:1.8rem;border-radius:20px;">🏫</div>
           <h1>สมัครสมาชิก</h1>
-          <p class="sub-title">ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส</p>
+          <p class="sub-title">ระบบนิเทศออนไลน์ โรงเรียนเอกชน จ.นราธิวาส</p>
         </div>
         <div id="regMsg" class="auth-msg"></div>
         <label>ชื่อ-นามสกุล</label>
@@ -534,12 +581,23 @@ function showRegister() {
 
 async function doLogin(e) {
   if (e) e.preventDefault();
+  if (LOGIN_BUSY) return false;
   const u = $('#username').value.trim();
   const p = $('#password').value;
   const msg = $('#loginMsg');
-  if (!u || !p) { msg.className = 'auth-msg err'; msg.textContent = 'กรุณากรอก Username และ Password'; return false; }
+  const btn = $('#loginBtn');
+  const alertLogin = (options) => window.Swal ? Swal.fire(options) : Promise.resolve();
+  if (!u || !p) {
+    msg.className = 'auth-msg err';
+    msg.textContent = 'กรุณากรอก Username และ Password';
+    await alertLogin({ icon: 'warning', title: 'ข้อมูลไม่ครบถ้วน', text: 'กรุณากรอก Username และ Password', confirmButtonText: 'ตกลง' });
+    return false;
+  }
+  LOGIN_BUSY = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...'; }
   msg.className = 'auth-msg err';
-  msg.textContent = 'กำลังตรวจสอบข้อมูล...';
+  msg.textContent = 'กำลังตรวจสอบข้อมูลและเรียกใช้ระบบ...';
+  if (window.Swal) Swal.fire({ title: 'กำลังเข้าสู่ระบบ', text: 'กำลังตรวจสอบข้อมูล กรุณารอสักครู่', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
   const r = await post('login', { username: u, password: p });
   if (r && r.success) {
     CURRENT_USER = r.userData;
@@ -550,14 +608,19 @@ async function doLogin(e) {
     }
     msg.className = 'auth-msg ok';
     msg.textContent = 'เข้าสู่ระบบสำเร็จ! กำลังโหลดระบบ...';
+    await alertLogin({ icon: 'success', title: 'เข้าสู่ระบบสำเร็จ', text: 'กำลังโหลดระบบนิเทศออนไลน์', timer: 900, showConfirmButton: false, allowOutsideClick: false });
     if (LOGIN_SCHOOL_ID) {
       startDashWithSchool(LOGIN_SCHOOL_ID);
     } else {
       startDash();
     }
   } else {
+    if (window.Swal) Swal.close();
+    LOGIN_BUSY = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
     msg.className = 'auth-msg err';
     msg.textContent = (r && r.message) || 'เข้าสู่ระบบไม่สำเร็จ';
+    await alertLogin({ icon: 'error', title: 'เข้าสู่ระบบไม่สำเร็จ', text: (r && r.message) || 'Username หรือ Password ไม่ถูกต้อง', confirmButtonText: 'ตกลง' });
   }
   return false;
 }
@@ -587,8 +650,10 @@ async function doRegister(e) {
 }
 
 function logout() {
+  if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
   CURRENT_USER = null;
   SCHOOLS = []; SELECTED = null; STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
+  if (typeof setFormClean === 'function') setFormClean();
   if (AUTO_SAVE_INTERVAL) clearInterval(AUTO_SAVE_INTERVAL);
   localStorage.removeItem(REMEMBER_KEY);
   clearDraft();
@@ -619,6 +684,7 @@ async function startDash() {
         <div id="pinCard"></div>
         <div class="side-actions">
           <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
       </div>
@@ -630,6 +696,7 @@ async function startDash() {
         <button class="tb-nav tab-btn" data-target="tab-5" onclick="switchTab('tab-5')">🧐 ตรวจเยี่ยมชั้นเรียน</button>
         <button class="tb-nav tab-btn" data-target="tab-6" onclick="switchTab('tab-6')">🔧 สะท้อนผล/แผนพัฒนา</button>
         <button class="tb-nav tab-btn" data-target="tab-7" onclick="switchTab('tab-7')">✅ ติดตาม/สรุป</button>
+        <button class="tb-nav tab-btn" data-target="tab-area" onclick="showAreaEvaluation()">🧭 นิเทศทั่วไประดับพื้นที่</button>
         <button class="tb-nav tab-btn" data-target="tab-files" onclick="showUploadsPanel()">📎 ไฟล์/หลักฐาน</button>
         <div class="nav-sep"></div>
         <button class="tb-nav tab-btn" data-target="tab-hist" onclick="showEvalHistory()">📜 ประวัติการนิเทศ</button>
@@ -648,6 +715,7 @@ async function startDash() {
         <div id="tab-5" class="panel"></div>
         <div id="tab-6" class="panel"></div>
         <div id="tab-7" class="panel"></div>
+        <div id="tab-area" class="panel"><div id="areaWrap"></div></div>
         <div id="tab-files" class="panel"><div id="filesWrap"></div></div>
         <div id="tab-hist" class="panel"><div id="histWrap"></div></div>
         <div id="tab-stats" class="panel"><div id="statsWrap"></div></div>
@@ -663,7 +731,7 @@ async function startDash() {
     SCHOOLS = (r.data || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const sel = $('#schoolSelect');
     sel.innerHTML = '<option value="">— เลือกสถานศึกษา —</option>' + SCHOOLS.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
-    if (!SCHOOLS.length) $('#pinCard').innerHTML = `<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ <br>ผู้ดูแลสามารถพิมพ์ข้อมูลลงชีต ADDR_SCHOOL (แถวที่ 6 เป็นต้นไป)</div>`;
+    if (!SCHOOLS.length) $('#pinCard').innerHTML = `<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ <br>ผู้ดูแลสามารถพิมพ์ข้อมูลลงชีต ADDR_SCHOOL (เริ่มแถวที่ 2)</div>`;
   } else {
     $('#pinCard').innerHTML = `<div class="empty">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อโรงเรียนได้')}</div>`;
   }
@@ -697,6 +765,7 @@ async function startDashWithSchool(schoolId) {
         <div id="pinCard"></div>
         <div class="side-actions">
           <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
       </div>
@@ -708,6 +777,7 @@ async function startDashWithSchool(schoolId) {
         <button class="tb-nav tab-btn" data-target="tab-5" onclick="switchTab('tab-5')">🧐 ตรวจเยี่ยมชั้นเรียน</button>
         <button class="tb-nav tab-btn" data-target="tab-6" onclick="switchTab('tab-6')">🔧 สะท้อนผล/แผนพัฒนา</button>
         <button class="tb-nav tab-btn" data-target="tab-7" onclick="switchTab('tab-7')">✅ ติดตาม/สรุป</button>
+        <button class="tb-nav tab-btn" data-target="tab-area" onclick="showAreaEvaluation()">🧭 นิเทศทั่วไประดับพื้นที่</button>
         <button class="tb-nav tab-btn" data-target="tab-files" onclick="showUploadsPanel()">📎 ไฟล์/หลักฐาน</button>
         <div class="nav-sep"></div>
         <button class="tb-nav tab-btn" data-target="tab-hist" onclick="showEvalHistory()">📜 ประวัติการนิเทศ</button>
@@ -726,6 +796,7 @@ async function startDashWithSchool(schoolId) {
         <div id="tab-5" class="panel"></div>
         <div id="tab-6" class="panel"></div>
         <div id="tab-7" class="panel"></div>
+        <div id="tab-area" class="panel"><div id="areaWrap"></div></div>
         <div id="tab-files" class="panel"><div id="filesWrap"></div></div>
         <div id="tab-hist" class="panel"><div id="histWrap"></div></div>
         <div id="tab-stats" class="panel"><div id="statsWrap"></div></div>
@@ -768,7 +839,7 @@ async function showDashboard() {
     <div class="dash-hero">
       <div class="dash-hero-text">
         <h1>👋 สวัสดี ${esc(CURRENT_USER ? CURRENT_USER.fname : '')}</h1>
-        <p>ยินดีต้อนรับสู่ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส</p>
+        <p>ยินดีต้อนรับสู่ระบบนิเทศออนไลน์ โรงเรียนเอกชน จ.นราธิวาส</p>
       </div>
       <button class="btn-start" onclick="startInspection()">
         <span class="btn-start-icon">🚀</span>
@@ -882,6 +953,7 @@ async function showDashboard() {
 // เริ่มการนิเทศ (เลือกสถานศึกษา)
 // ============================================================
 function startInspection() {
+  if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
   // แสดง dropdown เลือกสถานศึกษาแบบเต็มหน้าจอ
   const root = el('tab-1');
   root.innerHTML = `
@@ -927,17 +999,24 @@ function resumeDraft(schoolName) {
   else startInspection();
 }
 
-async function loadSchool(id) {
-  if (!id) { SELECTED = null; return; }
+async function loadSchool(id, options = {}) {
+  if (!options.skipConfirm && typeof confirmDiscardChanges === 'function' && SELECTED && id !== SELECTED.id && !confirmDiscardChanges()) {
+    const sel = $('#schoolSelect');
+    if (sel) sel.value = SELECTED.id;
+    return;
+  }
+  if (!id) { SELECTED = null; if (typeof setFormClean === 'function') setFormClean(); return; }
   const r = await post('getSchoolData', id);
   if (!r || !r.success) { toast((r||{}).message || 'โหลดข้อมูลไม่สำเร็จ', false); return; }
   SELECTED = r.data;
   SCHOOLS = SCHOOLS.map(s => s.id === SELECTED.id ? { ...s, ...r.data } : s);
   STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
+  EDIT_ROW = null;
   buildAll();
+  if (typeof setFormClean === 'function') setFormClean();
   switchTab('tab-1');
   startAutoSave();
-  restoreDraftIfAny();
+  if (!options.skipDraft) restoreDraftIfAny();
   toast('เลือก ' + SELECTED.name + ' แล้ว', true);
 }
 
@@ -1002,6 +1081,12 @@ function initPinBar() {
 
 // boot
 document.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('beforeunload', e => {
+    if (typeof hasUnsavedChanges === 'function' && hasUnsavedChanges()) {
+      e.preventDefault();
+      e.returnValue = 'มีข้อมูลนิเทศที่ยังไม่ได้บันทึก';
+    }
+  });
   if (API_URL === 'APPS_SCRIPT_API_URL') {
     toast('ยังไม่ได้กำหนด URL ของระบบ (ติดต่อผู้ดูแล)', false);
   }

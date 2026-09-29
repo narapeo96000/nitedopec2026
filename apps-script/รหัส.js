@@ -13,7 +13,7 @@ function normalizeForm(v) {
 // ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ จ.นราธิวาส
 // ใช้ชีต ADDR_SCHOOL + DATA_SCHOOL + USERS (USERS ร่วมกับระบบอื่น ภายใน Spreadsheet เดียวกัน)
 // อ้างอิง: แผนนิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียนโรงเรียนเอกชนในระบบ จ.นราธิวาส
-// โครงสร้างชีต ADDR_SCHOOL (เริ่มข้อมูลจริงที่แถว 6):
+// โครงสร้างชีต ADDR_SCHOOL (หัวตารางแถว 1, ข้อมูลเริ่มแถว 2):
 //   A=รหัส, B=ชื่อโรงเรียน, C=ที่อยู่, D=อำเภอ, E=ตำบล, F=โทรศัพท์,
 //   G=รูปแบบการจัดการศึกษา (แบบสอนสามัญ / แบบสอนสามัญควบคู่ศาสนาอิสลาม),
 //   H=ผู้บริหาร, I=จำนวนครู, J=จำนวนนักเรียน, K=พิกัดแผนที่
@@ -28,9 +28,33 @@ const SHEET_DATA_SCHOOL = 'DATA_SCHOOL';
 const SHEET_ADDR_SCHOOL = 'ADDR_SCHOOL';
 const SHEET_USERS = 'USERS';
 const SCHOOL_ADDR_COLS = 11;
+const SCHOOL_DATA_START_ROW = 2;
+const SHEET_LOGFILE = 'logfile_opec';
+const LOGFILE_HEADERS = ['Timestamp', 'Action', 'Sheet', 'Row', 'Record ID', 'Actor', 'Before Data'];
 
 // DATA_SCHOOL (15 คอลัมน์): Timestamp, ID, ชื่อโรงเรียน, รูปแบบ, ส1(0-44), ส2(0-16), ตรวจเยี่ยม(0-16), สุ่มตรวจ(0-8), รวมส1, ร้อยละ, ระดับ, รายละเอียด, ผู้นิเทศ, แก้ไขครั้งล่าสุด, ผู้แก้ไขล่าสุด
 const DATA_HEADERS = ['Timestamp', 'ID', 'ชื่อโรงเรียน', 'รูปแบบ', 'ส่วนที่1/44', 'ส่วนที่2/16', 'ตรวจเยี่ยม/16', 'สุ่มตรวจ/8', 'รวมส1', 'ร้อยละ', 'ระดับ', 'รายละเอียด', 'ผู้นิเทศ', 'แก้ไขครั้งล่าสุด', 'ผู้แก้ไขล่าสุด'];
+
+function ensureLogfileSheet() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(SHEET_LOGFILE);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_LOGFILE);
+    sheet.getRange(1, 1, 1, LOGFILE_HEADERS.length).setValues([LOGFILE_HEADERS]);
+  } else if (sheet.getLastColumn() < LOGFILE_HEADERS.length) {
+    sheet.getRange(1, 1, 1, LOGFILE_HEADERS.length).setValues([LOGFILE_HEADERS]);
+  }
+  return sheet;
+}
+
+// สำรองข้อมูลแถวเดิมก่อนแก้ไขหรือลบ หากเขียน logfile ไม่สำเร็จให้หยุดรายการหลัก
+function backupSheetRow(sheet, row, action, actor, recordId) {
+  if (!sheet) throw new Error('ไม่พบชีตสำหรับสำรองข้อมูล');
+  row = Number(row);
+  if (!row || row < 2 || row > sheet.getLastRow()) throw new Error('ไม่พบแถวข้อมูลที่ต้องการสำรอง');
+  const values = sheet.getRange(row, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  ensureLogfileSheet().appendRow([new Date(), String(action || ''), sheet.getName(), row, String(recordId || values[1] || ''), String(actor || ''), JSON.stringify(values)]);
+}
 
 function getPing() { return 'pong ' + new Date().toISOString(); }
 
@@ -69,6 +93,8 @@ function doPost(e) {
       res = getSchoolList();
     } else if (action === 'getStatsPublic') {
       res = getStatsSchool();
+    } else if (action === 'debugSchools') {
+      res = debugSchools();
     } else if (action === 'getStatsSchool') {
       res = getStatsSchool();
     } else if (action === 'getSchoolData') {
@@ -77,6 +103,10 @@ function doPost(e) {
       res = getSchoolEvaluations(payload);
     } else if (action === 'saveSchoolEvaluation') {
       res = saveSchoolEvaluation(payload);
+    } else if (action === 'getAreaEvaluations') {
+      res = getAreaEvaluations(payload);
+    } else if (action === 'saveAreaEvaluation') {
+      res = saveAreaEvaluation(payload);
     } else if (action === 'saveSchoolPin') {
       res = saveSchoolPin(payload);
     } else if (action === 'deleteSchoolEvaluation') {
@@ -220,6 +250,11 @@ function setUserStatus(data) {
   if(!isAdmin) return {success: false, message: 'ไม่มีสิทธิ์ใช้งาน (เฉพาะผู้ดูแลระบบ)'};
   if(targetRow < 1) return {success: false, message: 'ไม่พบบัญชีผู้ใช้นี้'};
   if(status === 'ใช้งาน' || status === 'ระงับ') {
+    try {
+      backupSheetRow(sheet, targetRow, 'USER_STATUS_EDIT_BEFORE', admin, target);
+    } catch (backupError) {
+      return { success: false, message: 'สำรองข้อมูลก่อนแก้ไขสถานะไม่สำเร็จ จึงยกเลิกการแก้ไข: ' + backupError.message };
+    }
     sheet.getRange(targetRow, 5).setValue(status);
     return {success: true, message: (status === 'ใช้งาน' ? '✅ เปิดใช้งาน' : '⛔ ระงับ') + 'บัญชี "' + target + '" เรียบร้อย'};
   }
@@ -242,8 +277,7 @@ function ensureSheets() {
   if(!addr) {
     const ns = ss.insertSheet(SHEET_ADDR_SCHOOL);
     ns.getRange(1, 1, 1, ADDR_HEADERS.length).setValues([ADDR_HEADERS]);
-    ns.getRange(2, 1, 1, ADDR_HEADERS.length).setValues([[ADDR_HEADERS[0],'',ADDR_HEADERS[2],ADDR_HEADERS[3],ADDR_HEADERS[4],ADDR_HEADERS[5],ADDR_HEADERS[6],ADDR_HEADERS[7],ADDR_HEADERS[8],ADDR_HEADERS[9],ADDR_HEADERS[10]]]);
-  } else if(addr.getLastRow() < 6) {
+  } else if(addr.getLastRow() < SCHOOL_DATA_START_ROW) {
     addr.getRange(1, 1, 1, ADDR_HEADERS.length).setValues([ADDR_HEADERS]);
   }
   return ss;
@@ -298,14 +332,14 @@ function getSchoolEvaluations(id) {
   return {success: true, data: list};
 }
 
-// --- รายชื่อสถานศึกษา (ADDR_SCHOOL แถว 6 เป็นต้นไป) ---
+// --- รายชื่อสถานศึกษา (ADDR_SCHOOL แถว 2 เป็นต้นไป) ---
 function getSchoolList() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(SHEET_ADDR_SCHOOL);
   if(!sheet) return {success: true, data: []};
   const lastRow = sheet.getLastRow();
-  if(lastRow < 6) return {success: true, data: []};
-  const rows = sheet.getRange(6, 1, lastRow - 5, SCHOOL_ADDR_COLS).getValues();
+  if(lastRow < SCHOOL_DATA_START_ROW) return {success: true, data: []};
+  const rows = sheet.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, SCHOOL_ADDR_COLS).getValues();
   const list = [];
   for(let i = 0; i < rows.length; i++) {
     if(String(rows[i][0]).trim() === '') continue;
@@ -333,14 +367,14 @@ function getSchoolData(id) {
   const sheet = ss.getSheetByName(SHEET_ADDR_SCHOOL);
   if(sheet) {
     const lastRow = sheet.getLastRow();
-    if(lastRow >= 6) {
-      const rows = sheet.getRange(6, 1, lastRow - 5, SCHOOL_ADDR_COLS).getValues();
+    if(lastRow >= SCHOOL_DATA_START_ROW) {
+      const rows = sheet.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, SCHOOL_ADDR_COLS).getValues();
       for(let i = 0; i < rows.length; i++) {
         if(String(rows[i][0]).trim() === id) {
           return {
             success: true,
             data: {
-              row: i + 6,
+              row: i + SCHOOL_DATA_START_ROW,
               id: rows[i][0], name: rows[i][1], address: rows[i][2],
               dist: rows[i][3], subdist: rows[i][4], phone: rows[i][5],
               form: normalizeForm(rows[i][6]),
@@ -366,11 +400,16 @@ function saveSchoolPin(payload) {
   const sheet = ss.getSheetByName(SHEET_ADDR_SCHOOL);
   if (!sheet) return {success: false, message: 'ไม่พบชีต ADDR_SCHOOL'};
   const lastRow = sheet.getLastRow();
-  if (lastRow < 6) return {success: false, message: 'ไม่มีข้อมูลโรงเรียน'};
-  const ids = sheet.getRange(6, 1, lastRow - 5, 1).getValues();
+  if (lastRow < SCHOOL_DATA_START_ROW) return {success: false, message: 'ไม่มีข้อมูลโรงเรียน'};
+  const ids = sheet.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, 1).getValues();
   for (let i = 0; i < ids.length; i++) {
     if (String(ids[i][0]).trim() === id) {
-      sheet.getRange(6 + i, 11).setValue(coords);
+      try {
+        backupSheetRow(sheet, SCHOOL_DATA_START_ROW + i, 'PIN_EDIT_BEFORE', '', id);
+      } catch (backupError) {
+        return { success: false, message: 'สำรองข้อมูลก่อนแก้ไขพิกัดไม่สำเร็จ จึงยกเลิกการแก้ไข: ' + backupError.message };
+      }
+      sheet.getRange(SCHOOL_DATA_START_ROW + i, 11).setValue(coords);
       return {success: true, message: 'บันทึกพิกัดแผนที่เรียบร้อย'};
     }
   }
@@ -385,12 +424,6 @@ function saveSchoolEvaluation(payload) {
   const e = payload.evalData || {};
 
   const addrSheet = ss.getSheetByName(SHEET_ADDR_SCHOOL);
-  if(addrSheet && t.row) {
-    addrSheet.getRange(t.row, 2, 1, 9).setValues([[
-      t.name, t.address, t.dist, t.subdist, t.phone, t.form, t.admin, t.staff, t.students
-    ]]);
-  }
-
   ensureSheets();
   const dataSheet = ss.getSheetByName(SHEET_DATA_SCHOOL);
   const supervisor = String(payload.supervisor || '');
@@ -417,6 +450,17 @@ function saveSchoolEvaluation(payload) {
 
   if(payload.editRow && !isNaN(payload.editRow)) {
     const row = Number(payload.editRow);
+    try {
+      backupSheetRow(dataSheet, row, 'EDIT_BEFORE', supervisor, t.id);
+      if (addrSheet && t.row) backupSheetRow(addrSheet, Number(t.row), 'EDIT_ADDR_BEFORE', supervisor, t.id);
+    } catch (backupError) {
+      return { success: false, message: 'สำรองข้อมูลก่อนแก้ไขไม่สำเร็จ จึงยกเลิกการแก้ไข: ' + backupError.message };
+    }
+    if(addrSheet && t.row) {
+      addrSheet.getRange(t.row, 2, 1, 9).setValues([[
+        t.name, t.address, t.dist, t.subdist, t.phone, t.form, t.admin, t.staff, t.students
+      ]]);
+    }
     dataSheet.getRange(row, 4).setValue(e.formType);
     dataSheet.getRange(row, 5).setValue(e.s1 !== undefined ? e.s1 : '');
     dataSheet.getRange(row, 6).setValue(e.s2 !== undefined ? e.s2 : '');
@@ -461,8 +505,35 @@ function deleteSchoolEvaluation(payload) {
   const ds = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_DATA_SCHOOL);
   if(!ds) return {success: false, message: 'ไม่พบชีต DATA_SCHOOL'};
   if(row < 2 || row > ds.getLastRow()) return {success: false, message: 'ไม่พบแถวข้อมูล'};
+  try {
+    const recordId = ds.getRange(row, 2).getValue();
+    backupSheetRow(ds, row, 'DELETE_BEFORE', admin, recordId);
+  } catch (backupError) {
+    return { success: false, message: 'สำรองข้อมูลก่อนลบไม่สำเร็จ จึงยกเลิกการลบ: ' + backupError.message };
+  }
   ds.deleteRow(row);
   return {success: true, message: 'ลบผลการนิเทศเรียบร้อยแล้ว'};
+}
+
+// --- debug: ดู row count และข้อมูลดิบ ---
+function debugSchools() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const addr = ss.getSheetByName(SHEET_ADDR_SCHOOL);
+  if (!addr) return { success: true, message: 'no sheet' };
+  const lastRow = addr.getLastRow();
+  const totalCols = addr.getLastColumn();
+  // อ่านข้อมูลตั้งแต่แถวเริ่มต้น โดยจำกัดผลตรวจไว้ 200 แถว
+  const dataRows = Math.max(0, lastRow - SCHOOL_DATA_START_ROW + 1);
+  const maxRows = Math.min(200, dataRows);
+  const vals = maxRows ? addr.getRange(SCHOOL_DATA_START_ROW, 1, maxRows, SCHOOL_ADDR_COLS).getValues() : [];
+  let count = 0;
+  const emptyIds = [];
+  for (let i = 0; i < vals.length; i++) {
+    const id = String(vals[i][0]).trim();
+    if (id === '') { emptyIds.push(i + SCHOOL_DATA_START_ROW); continue; }
+    count++;
+  }
+  return { success: true, lastRow, totalCols, SCHOOL_ADDR_COLS, maxRows, totalDataRows: vals.length, nonEmptyIds: count, emptyIdRows: emptyIds };
 }
 
 // --- สถิติระบบนิเทศโรงเรียนเอกชน (ADDR_SCHOOL + DATA_SCHOOL + USERS) ---
@@ -477,8 +548,8 @@ function getStatsSchool() {
   const addr = ss.getSheetByName(SHEET_ADDR_SCHOOL);
   if(addr) {
     const lastRow = addr.getLastRow();
-    if(lastRow >= 6) {
-      const vals = addr.getRange(6, 1, lastRow - 5, SCHOOL_ADDR_COLS).getValues();
+    if(lastRow >= SCHOOL_DATA_START_ROW) {
+      const vals = addr.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, SCHOOL_ADDR_COLS).getValues();
       for(let i = 0; i < vals.length; i++) {
         if(String(vals[i][0]).trim() === '') continue;
         totalSchools++;
@@ -546,6 +617,11 @@ function getStatsSchool() {
 // ============================================================
 function uploadFolder() {
   return DriveApp.getFolderById(DRIVE_FOLDER_ID);
+}
+// เรียกใช้ครั้งเดียวจาก Apps Script Editor เพื่อขออนุมัติสิทธิ์ Google Drive
+function authorizeDriveAccess() {
+  const folder = uploadFolder();
+  return { success: true, folderId: folder.getId(), folderName: folder.getName() };
 }
 function schoolFolder(schoolId) {
   const base = uploadFolder();
@@ -694,8 +770,8 @@ function fetchStatisticsForAISchool() {
   const lines = [];
   if (sheet) {
     const lastRow = sheet.getLastRow();
-    if (lastRow >= 6) {
-      const data = sheet.getRange(6, 1, lastRow - 5, SCHOOL_ADDR_COLS).getValues();
+    if (lastRow >= SCHOOL_DATA_START_ROW) {
+      const data = sheet.getRange(SCHOOL_DATA_START_ROW, 1, lastRow - SCHOOL_DATA_START_ROW + 1, SCHOOL_ADDR_COLS).getValues();
       for (let i = 0; i < data.length; i++) {
         if (String(data[i][0]).trim() === '') continue;
         stats.count++;
@@ -748,4 +824,49 @@ function callGeminiAPI(userMessage, contextData, settings) {
     } catch (err) { continue; }
   }
   return offlineChatReply(String(userMessage || '').toLowerCase());
+}
+
+// แบบนิเทศทั่วไประดับพื้นที่เก็บแยกจาก DATA_SCHOOL เพื่อคงรูปแบบข้อมูลเดิมไว้
+const SHEET_AREA_EVALUATIONS = 'AREA_EVALUATIONS';
+const AREA_EVALUATION_HEADERS = ['Timestamp', 'ID', 'ชื่อโรงเรียน', 'วันที่นิเทศ', 'ผู้นิเทศ', 'รายละเอียด'];
+
+function ensureAreaEvaluationsSheet() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(SHEET_AREA_EVALUATIONS);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_AREA_EVALUATIONS);
+    sheet.getRange(1, 1, 1, AREA_EVALUATION_HEADERS.length).setValues([AREA_EVALUATION_HEADERS]);
+  }
+  return sheet;
+}
+
+function getAreaEvaluations(id) {
+  const schoolId = String(typeof id === 'object' && id !== null ? (id.id || '') : id || '').trim();
+  if (!schoolId) return { success: false, message: 'ไม่พบรหัสโรงเรียน' };
+  const sheet = ensureAreaEvaluationsSheet();
+  const lastRow = sheet.getLastRow();
+  const list = [];
+  if (lastRow >= 2) {
+    const rows = sheet.getRange(2, 1, lastRow - 1, AREA_EVALUATION_HEADERS.length).getValues();
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][1]).trim() !== schoolId) continue;
+      let details = {};
+      try { details = JSON.parse(rows[i][5] || '{}'); } catch (e) {}
+      list.push({ timestamp: formatDate(rows[i][0]), evalDate: details.visitDate || '', supervisor: rows[i][4] || '' });
+    }
+  }
+  list.sort((a, b) => a.timestamp < b.timestamp ? 1 : -1);
+  return { success: true, data: list };
+}
+
+function saveAreaEvaluation(payload) {
+  const p = (typeof payload === 'object' && payload !== null) ? payload : {};
+  const id = String(p.id || '').trim();
+  const name = String(p.name || '').trim();
+  if (!id || !name) return { success: false, message: 'กรุณาเลือกสถานศึกษา' };
+  const details = p.details || {};
+  if (!details.ratings || !Object.keys(details.ratings).length) return { success: false, message: 'กรุณาให้คะแนนอย่างน้อย 1 ข้อ' };
+  const sheet = ensureAreaEvaluationsSheet();
+  sheet.appendRow([new Date(), id, name, details.visitDate || '', String(p.supervisor || ''), JSON.stringify(details)]);
+  return { success: true, message: 'บันทึกแบบนิเทศทั่วไประดับพื้นที่เรียบร้อยแล้ว' };
 }
