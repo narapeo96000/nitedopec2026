@@ -995,19 +995,19 @@ function startInspection() {
   // แสดงขั้นตอนเลือกโหมดก่อนเลือกสถานศึกษา
   const root = el('tab-1');
   root.innerHTML = `
-    <div class="dash-hero">
+    <div class="dash-hero inspection-start-hero">
       <div class="dash-hero-text">
         <h1>🚀 เริ่มการนิเทศ</h1>
         <p>ขั้นตอนที่ 1 จาก 2 · เลือกโหมดการนิเทศก่อนเลือกสถานศึกษา</p>
       </div>
     </div>
-    <div class="dash-section">
+    <div class="dash-section inspection-mode-section">
       <h3>เลือกประเภทการนิเทศ</h3>
       <div class="dash-stats">
-        <button class="dash-stat-card" type="button" onclick="chooseInspectionMode('full')">
+        <button class="dash-stat-card inspection-mode-full" type="button" onclick="chooseInspectionMode('full')">
           <div class="dash-stat-icon">📋</div><div class="dash-stat-label">นิเทศเต็มรูปแบบ</div><small>บันทึกข้อมูลครบทุกด้าน</small>
         </button>
-        <button class="dash-stat-card" type="button" onclick="chooseInspectionMode('general')">
+        <button class="dash-stat-card inspection-mode-general" type="button" onclick="chooseInspectionMode('general')">
           <div class="dash-stat-icon">🧭</div><div class="dash-stat-label">นิเทศทั่วไป</div><small>บันทึกเฉพาะแบบนิเทศทั่วไประดับพื้นที่</small>
         </button>
       </div>
@@ -1076,6 +1076,10 @@ function pickSchool(id) {
 function chooseInspectionMode(mode) {
   INSPECTION_MODE = mode === 'general' ? 'general' : 'full';
   INSPECTION_SCHOOL_PENDING = '';
+  const fullCard = document.querySelector('.inspection-mode-full');
+  const generalCard = document.querySelector('.inspection-mode-general');
+  if (fullCard) fullCard.classList.toggle('selected', INSPECTION_MODE === 'full');
+  if (generalCard) generalCard.classList.toggle('selected', INSPECTION_MODE === 'general');
   const hint = $('#inspectionModeHint');
   if (hint) hint.textContent = INSPECTION_MODE === 'general'
     ? 'เลือกสถานศึกษาเพื่อเปิดแบบนิเทศทั่วไปเท่านั้น'
