@@ -132,8 +132,42 @@ function getColor(pct) {
   return "#dc2626";
 }
 
+const API_STATUS_TITLES = {
+  getSchoolList: 'กำลังเรียกใช้ข้อมูล',
+  getSchoolData: 'กำลังเรียกใช้ข้อมูล',
+  getSchoolEvaluations: 'กำลังเรียกใช้ข้อมูล',
+  getAreaEvaluations: 'กำลังเรียกใช้ข้อมูล',
+  getStatsSchool: 'กำลังเรียกใช้ข้อมูล',
+  getStatsPublic: 'กำลังเรียกใช้ข้อมูล',
+  getSchoolListPublic: 'กำลังเรียกใช้ข้อมูล',
+  getUploads: 'กำลังเรียกใช้ข้อมูล',
+  getUsers: 'กำลังเรียกใช้ข้อมูล',
+  saveSchoolEvaluation: 'กำลังบันทึกข้อมูล',
+  saveAreaEvaluation: 'กำลังบันทึกข้อมูล',
+  saveSchoolPin: 'กำลังบันทึกข้อมูล',
+  setUserStatus: 'กำลังบันทึกข้อมูล',
+  uploadFile: 'กำลังอัปโหลดเอกสาร',
+  deleteUpload: 'กำลังบันทึกข้อมูล',
+  deleteSchoolEvaluation: 'กำลังบันทึกข้อมูล'
+};
+
+function openApiStatus(action) {
+  const title = API_STATUS_TITLES[action];
+  if (!title || !window.Swal || Swal.isVisible()) return false;
+  Swal.fire({
+    title,
+    text: 'กรุณารอสักครู่',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    didOpen: () => Swal.showLoading()
+  });
+  return true;
+}
+
 // --- Network retry (3 ครั้ง + exponential backoff) ---
 async function post(action, payload, retries = 3) {
+  const statusOpened = openApiStatus(action);
   for (let i = 0; i < retries; i++) {
     try {
       const r = await fetch(API_URL, {
@@ -141,9 +175,12 @@ async function post(action, payload, retries = 3) {
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({ action, payload })
       });
-      return await r.json();
+      const result = await r.json();
+      if (statusOpened && window.Swal) Swal.close();
+      return result;
     } catch (e) {
       if (i === retries - 1) {
+        if (statusOpened && window.Swal) Swal.close();
         return { success: false, message: "เชื่อมต่อระบบล้มเหลว โปรดตรวจอินเทอร์เน็ตแล้วลองใหม่ (" + e.message + ")" };
       }
       await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
