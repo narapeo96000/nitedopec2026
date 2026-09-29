@@ -293,6 +293,16 @@ textarea.note{width:100%;resize:vertical}
 .satellite-layer{z-index:0;opacity:.85}
 /* --- Dashboard --- */
 .dash-hero{background:linear-gradient(135deg,#052e2b 0%,#0f766e 60%,#0ea5e9 100%);border-radius:16px;padding:28px 24px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.inspection-start-hero{background:linear-gradient(135deg,#312e81 0%,#2563eb 58%,#0ea5e9 100%);border-left:6px solid #f59e0b}
+.inspection-start-hero h1{color:#fff}
+.inspection-start-hero p{color:#dbeafe}
+.inspection-mode-section{border-top:5px solid #6366f1;background:linear-gradient(180deg,#eef2ff 0%,#fff 42%)}
+.inspection-mode-section h3{color:#3730a3}
+.inspection-mode-full,.inspection-mode-general{border:2px solid transparent}
+.inspection-mode-full{background:#eff6ff;border-color:#93c5fd;color:#1e3a8a}
+.inspection-mode-general{background:#ecfdf5;border-color:#86efac;color:#065f46}
+.inspection-mode-full.selected{background:#dbeafe;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+.inspection-mode-general.selected{background:#d1fae5;border-color:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.18)}
 .dash-hero-text h1{font-size:24px;color:#fff;margin-bottom:4px}
 .dash-hero-text p{color:#ccfbf1;font-size:14px}
 .btn-start{background:#fff;color:#065f46;border:none;border-radius:14px;padding:18px 28px;cursor:pointer;text-align:left;box-shadow:0 8px 30px rgba(0,0,0,.2);transition:.2s;min-width:220px}
@@ -486,6 +496,13 @@ textarea.note{width:100%;resize:vertical}
   .tb th{background:#134e4a;color:#5eead4}
   .score-bar,.stat-card b{color:#5eead4}
   .dash-hero{background:linear-gradient(135deg,#020617 0%,#134e4a 60%,#0c4a6e 100%)}
+  .inspection-start-hero{background:linear-gradient(135deg,#1e1b4b 0%,#1e3a8a 58%,#0c4a6e 100%);border-left-color:#fbbf24}
+  .inspection-mode-section{background:linear-gradient(180deg,#1e1b4b 0%,#1e293b 42%);border-top-color:#818cf8}
+  .inspection-mode-section h3{color:#c7d2fe}
+  .inspection-mode-full{background:#172554;border-color:#60a5fa;color:#bfdbfe}
+  .inspection-mode-general{background:#064e3b;border-color:#34d399;color:#a7f3d0}
+  .inspection-mode-full.selected{background:#1e3a8a;border-color:#93c5fd}
+  .inspection-mode-general.selected{background:#047857;border-color:#6ee7b7}
   .btn-start{background:#1e293b;color:#5eead4}
   .btn-start-text{color:#5eead4}
   .dash-stat-card,.dash-section,.school-pick-card{background:#1e293b;border-color:#334155;color:#e2e8f0}
