@@ -1023,7 +1023,7 @@ async function loadSchool(id, options = {}) {
 
 // -------- แผนที่ (Leaflet + GPS) --------
 function initPinBar() {
-  const card = $('#pinCard');
+  const card = $('#basicPinCard') || $('#pinCard');
   if (!card) return;
   card.innerHTML = `<div class="pin-head"><b>📍 ที่ตั้งสถานศึกษา</b>
     <button type="button" class="btn btn-mini" id="gpsBtn">📌 หาพิกัดปัจจุบัน</button></div>
@@ -1033,6 +1033,11 @@ function initPinBar() {
   if (typeof L === 'undefined') {
     card.innerHTML = '<div class="empty">แผนที่โหลดไม่พร้อม (Leaflet)</div>';
     return;
+  }
+  if (MAP) {
+    MAP.remove();
+    MAP = null;
+    MAP_MARKER = null;
   }
   if (!MAP) {
     MAP = L.map('map').setView([6.4246, 101.8249], 10);

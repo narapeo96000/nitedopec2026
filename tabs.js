@@ -177,7 +177,7 @@ function buildTab1() {
       return `<label class="round edu-type"><input type="radio" name="educationForm" value="${esc(value)}" ${current === value ? 'checked' : ''}><span><b>${label}</b></span></label>`;
     }).join('')}</div>
     <div class="sec-h">ปักหมุด พิกัดแผนที่</div>
-    <div class="pin-coords basic-pin-row"><input id="basicCoords" placeholder="ละติจูด, ลองจิจูด" value="${esc(SELECTED_COORDS || (SELECTED && SELECTED.coords) || '')}"><button type="button" class="btn btn-mini" id="basicSetPin">บันทึกพิกัด</button></div>
+    <div id="basicPinCard"></div>
     <div class="sep"></div>
     <div class="sec-h">ข้อมูล ณ วันที่นิเทศ</div>
     <div class="kv-grid">${renderKeyvals([
@@ -203,19 +203,6 @@ function buildTab1() {
       if (dk === 'name') { /* แสดงผลเมื่อบันทึกแล้ว */ }
     });
   });
-  const basicPin = root.querySelector('#basicSetPin');
-  if (basicPin) basicPin.onclick = async () => {
-    const input = root.querySelector('#basicCoords');
-    const coords = input ? input.value.trim() : '';
-    if (!coords) { toast('กรุณาระบุพิกัด', false); return; }
-    if (!SELECTED) { toast('กรุณาเลือกสถานศึกษาก่อน', false); return; }
-    const r = await post('saveSchoolPin', { id: SELECTED.id, coords });
-    if (r && r.success) {
-      SELECTED_COORDS = coords;
-      SELECTED.coords = coords;
-      toast(r.message || 'บันทึกพิกัดเรียบร้อย', true);
-    } else toast((r || {}).message || 'บันทึกพิกัดไม่สำเร็จ', false);
-  };
   // ย้าย: ใช้ updateScoreBar display ได้ (bar อยู่ด้านบนทุกแท็บ)
 }
 
