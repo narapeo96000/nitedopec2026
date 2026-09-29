@@ -189,9 +189,24 @@ function buildTab1() {
     ])}
     </div>
     <div class="sec-h">รอบการนิเทศ / ประเภทการนิเทศ</div>
-    <div class="kv-grid">${ROUNDS.map(r => `<label class="round"><input type="radio" name="formType" value="${esc(r.v)}" ${r === ROUNDS[0] ? 'checked' : ''}><span><b>${esc(r.v)}</b><small>${esc(r.note)}</small></span></label>`).join('')}</div>
+    <div class="kv-grid">${ROUNDS.map(r => {
+      const currentRound = STATE.evalMeta.formType || ROUNDS[0].v;
+      const checked = currentRound === r.v || (r.v === 'รอบที่ 3 (เพิ่มเติม)' && currentRound.indexOf(r.v) === 0);
+      return `<label class="round"><input type="radio" name="formType" value="${esc(r.v)}" ${checked ? 'checked' : ''}><span><b>${esc(r.v)}</b><small>${esc(r.note)}</small></span></label>`;
+    }).join('')}</div>
+    <label class="area-field" id="roundOtherWrap" style="display:${(STATE.evalMeta.formType || '').indexOf('รอบที่ 3 (เพิ่มเติม)') === 0 ? 'block' : 'none'};margin-top:10px"><span>รายละเอียดรอบที่ 3</span><input type="text" id="roundOther" class="form-control" placeholder="ระบุรายละเอียดรอบการนิเทศเพิ่มเติม" value="${esc(STATE.evalMeta.roundOther || '')}"></label>
   </div>`;
-  root.querySelectorAll('input[name=formType]').forEach(r => r.addEventListener('change', () => { STATE.evalMeta.formType = r.value; }));
+  root.querySelectorAll('input[name=formType]').forEach(r => r.addEventListener('change', () => {
+    STATE.evalMeta.formType = r.value;
+    const other = root.querySelector('#roundOtherWrap');
+    if (other) other.style.display = r.value === 'รอบที่ 3 (เพิ่มเติม)' ? 'block' : 'none';
+    if (typeof markFormDirty === 'function') markFormDirty();
+  }));
+  const roundOther = root.querySelector('#roundOther');
+  if (roundOther) roundOther.addEventListener('input', () => {
+    STATE.evalMeta.roundOther = roundOther.value;
+    if (typeof markFormDirty === 'function') markFormDirty();
+  });
   root.querySelectorAll('input[name=educationForm]').forEach(r => r.addEventListener('change', () => {
     STATE.basic.form = r.value;
     if (typeof markFormDirty === 'function') markFormDirty();
@@ -534,9 +549,12 @@ function collectResult() {
     evalDate: basic.evalDate || new Date().toISOString().slice(0,10),
     informant: basic.informant || ''
   };
+  const selectedRound = STATE.evalMeta.formType || ROUNDS[0].v;
+  const roundOther = String(STATE.evalMeta.roundOther || '').trim();
+  const fullRound = selectedRound === 'รอบที่ 3 (เพิ่มเติม)' && roundOther ? selectedRound + ': ' + roundOther : selectedRound;
   const evalData = {
-    formType: STATE.evalMeta.formType || ROUNDS[0].v,
-    round: STATE.evalMeta.formType || ROUNDS[0].v,
+    formType: fullRound,
+    round: fullRound,
     answers: STATE.answers,
     notes: { support_etc, develop: (document.querySelector('[data-key=develop]')||{}).value || '' , ...STATE.notes },
     basic: { ...basic, ...t },
@@ -726,7 +744,7 @@ async function loadHistoryRow(row) {
     multibasic: d.multibasic || {},
     multiVals: d.multiVals || {},
     basic: d.basic || {},
-    evalMeta: { formType: d.formType || 'รอบที่ 1 (ภาคเรียนที่ 1)', round: d.round || '' }
+    evalMeta: { formType: (d.formType || '').indexOf('รอบที่ 3 (เพิ่มเติม)') === 0 ? 'รอบที่ 3 (เพิ่มเติม)' : (d.formType || 'รอบที่ 1 (ภาคเรียนที่ 1)'), round: d.round || '', roundOther: (d.formType || '').indexOf('รอบที่ 3 (เพิ่มเติม): ') === 0 ? d.formType.replace('รอบที่ 3 (เพิ่มเติม): ', '') : '' }
   };
   EDIT_ROW = Number(row);
   buildAll();
