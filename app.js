@@ -293,6 +293,7 @@ const REMEMBER_KEY = "opec_login";
 
 let CAPTCHA_A = 0, CAPTCHA_B = 0, CAPTCHA_OP = '+';
 let LOGIN_SCHOOL_ID = '';
+let LOGIN_INSPECTION_MODE = '';
 let LOGIN_BUSY = false;
 
 function genCaptcha() {
@@ -309,6 +310,7 @@ function checkCaptcha() {
 
 function showLogin() {
   LOGIN_SCHOOL_ID = '';
+  LOGIN_INSPECTION_MODE = '';
   LOGIN_BUSY = false;
   const app = $('#app');
   app.innerHTML = `
@@ -333,6 +335,12 @@ function showLogin() {
       <div class="card auth-card">
         <h4 class="text-center mb-3" style="color:#065f46;margin-top:0;">เข้าสู่ระบบ</h4>
         <div id="loginMsg" class="auth-msg"></div>
+        <div class="sec-h" style="margin-top:8px">เลือกรูปแบบการนิเทศ</div>
+        <div class="dash-stats" style="grid-template-columns:1fr 1fr;gap:8px;margin:8px 0">
+          <button type="button" class="dash-stat-card" id="loginModeFull" onclick="loginPickInspectionMode('full')"><div class="dash-stat-icon">📋</div><div class="dash-stat-label">นิเทศเต็มรูปแบบ</div></button>
+          <button type="button" class="dash-stat-card" id="loginModeGeneral" onclick="loginPickInspectionMode('general')"><div class="dash-stat-icon">🧭</div><div class="dash-stat-label">นิเทศทั่วไป</div></button>
+        </div>
+        <div id="loginModeHint" class="hint">กรุณาเลือกรูปแบบการนิเทศ</div>
         <label>Username</label>
         <input type="text" id="username" class="form-control mb-3" autocomplete="username">
         <label>Password</label>
@@ -466,6 +474,17 @@ function loginPickSchool(id) {
   const inp = $('#lgSchoolSearch'); if (inp) inp.value = s ? s.name : id;
   toast(s ? ('เลือก: ' + s.name) : 'เลือก: ' + id, true);
 }
+function loginPickInspectionMode(mode) {
+  LOGIN_INSPECTION_MODE = mode === 'general' ? 'general' : 'full';
+  const full = $('#loginModeFull');
+  const general = $('#loginModeGeneral');
+  if (full) full.classList.toggle('selected', LOGIN_INSPECTION_MODE === 'full');
+  if (general) general.classList.toggle('selected', LOGIN_INSPECTION_MODE === 'general');
+  const hint = $('#loginModeHint');
+  if (hint) hint.textContent = LOGIN_INSPECTION_MODE === 'general'
+    ? 'เลือกนิเทศทั่วไป: บันทึกเฉพาะแบบนิเทศทั่วไประดับพื้นที่'
+    : 'เลือกนิเทศเต็มรูปแบบ: บันทึกข้อมูลครบทุกด้าน';
+}
 function renderDir() {
   const body = $('#dirBody');
   if (!body) return;
@@ -596,6 +615,10 @@ async function doLogin(e) {
     await alertLogin({ icon: 'warning', title: 'ข้อมูลไม่ครบถ้วน', text: 'กรุณากรอก Username และ Password', confirmButtonText: 'ตกลง' });
     return false;
   }
+  if (!LOGIN_INSPECTION_MODE) {
+    await alertLogin({ icon: 'warning', title: 'กรุณาเลือกรูปแบบการนิเทศ', text: 'เลือกระหว่างนิเทศเต็มรูปแบบหรือนิเทศทั่วไปก่อนเข้าสู่ระบบ', confirmButtonText: 'ตกลง' });
+    return false;
+  }
   LOGIN_BUSY = true;
   if (btn) { btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...'; }
   msg.className = 'auth-msg err';
@@ -604,6 +627,7 @@ async function doLogin(e) {
   const r = await post('login', { username: u, password: p });
   if (r && r.success) {
     CURRENT_USER = r.userData;
+    INSPECTION_MODE = LOGIN_INSPECTION_MODE;
     if ($('#rememberPass') && $('#rememberPass').checked) {
       localStorage.setItem(REMEMBER_KEY, JSON.stringify({ u, p: btoa(unescape(encodeURIComponent(p))) }));
     } else {
@@ -963,7 +987,8 @@ async function showDashboard() {
 // ============================================================
 function startInspection() {
   if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
-  INSPECTION_MODE = '';
+  const preselectedMode = INSPECTION_MODE === 'full' || INSPECTION_MODE === 'general' ? INSPECTION_MODE : '';
+  INSPECTION_MODE = preselectedMode;
   // แสดงขั้นตอนเลือกโหมดก่อนเลือกสถานศึกษา
   const root = el('tab-1');
   root.innerHTML = `
@@ -990,6 +1015,7 @@ function startInspection() {
   // sync sidebar dropdown
   const sel = $('#schoolSelect');
   if (sel) sel.value = '';
+  if (preselectedMode) chooseInspectionMode(preselectedMode);
 }
 
 function renderInspectionSchoolStep() {
@@ -1031,6 +1057,7 @@ function nextToInspectionRecording() {
 
 function backToInspectionMode() {
   INSPECTION_SCHOOL_PENDING = '';
+  INSPECTION_MODE = '';
   startInspection();
 }
 
