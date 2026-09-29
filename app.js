@@ -290,6 +290,7 @@ const REMEMBER_KEY = "opec_login";
 
 let CAPTCHA_A = 0, CAPTCHA_B = 0, CAPTCHA_OP = '+';
 let LOGIN_SCHOOL_ID = '';
+let LOGIN_BUSY = false;
 
 function genCaptcha() {
   CAPTCHA_A = Math.floor(Math.random() * 20) + 1;
@@ -305,6 +306,7 @@ function checkCaptcha() {
 
 function showLogin() {
   LOGIN_SCHOOL_ID = '';
+  LOGIN_BUSY = false;
   const app = $('#app');
   app.innerHTML = `
   <div class="landing">
@@ -345,7 +347,7 @@ function showLogin() {
         <div id="lgSelInfo" class="info-box d-none">
           <b id="lgSelName"></b><br><span id="lgSelDetail" class="small text-muted"></span>
         </div>
-        <button class="btn btn-primary w-100 mt-3" onclick="doLogin(event)">เข้าสู่ระบบ</button>
+        <button class="btn btn-primary w-100 mt-3" id="loginBtn" onclick="doLogin(event)">เข้าสู่ระบบ</button>
         <p class="text-center mt-3 mb-0 small">ยังไม่มีบัญชี? <a href="javascript:void(0)" class="login-link" onclick="showRegister()">สมัครสมาชิก</a></p>
       </div>
 
@@ -579,9 +581,11 @@ function showRegister() {
 
 async function doLogin(e) {
   if (e) e.preventDefault();
+  if (LOGIN_BUSY) return false;
   const u = $('#username').value.trim();
   const p = $('#password').value;
   const msg = $('#loginMsg');
+  const btn = $('#loginBtn');
   const alertLogin = (options) => window.Swal ? Swal.fire(options) : Promise.resolve();
   if (!u || !p) {
     msg.className = 'auth-msg err';
@@ -589,9 +593,11 @@ async function doLogin(e) {
     await alertLogin({ icon: 'warning', title: 'ข้อมูลไม่ครบถ้วน', text: 'กรุณากรอก Username และ Password', confirmButtonText: 'ตกลง' });
     return false;
   }
+  LOGIN_BUSY = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...'; }
   msg.className = 'auth-msg err';
-  msg.textContent = 'กำลังตรวจสอบข้อมูล...';
-  if (window.Swal) Swal.fire({ title: 'กำลังตรวจสอบการเข้าสู่ระบบ', text: 'กรุณารอสักครู่', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
+  msg.textContent = 'กำลังตรวจสอบข้อมูลและเรียกใช้ระบบ...';
+  if (window.Swal) Swal.fire({ title: 'กำลังเข้าสู่ระบบ', text: 'กำลังตรวจสอบข้อมูล กรุณารอสักครู่', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
   const r = await post('login', { username: u, password: p });
   if (r && r.success) {
     CURRENT_USER = r.userData;
@@ -610,6 +616,8 @@ async function doLogin(e) {
     }
   } else {
     if (window.Swal) Swal.close();
+    LOGIN_BUSY = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
     msg.className = 'auth-msg err';
     msg.textContent = (r && r.message) || 'เข้าสู่ระบบไม่สำเร็จ';
     await alertLogin({ icon: 'error', title: 'เข้าสู่ระบบไม่สำเร็จ', text: (r && r.message) || 'Username หรือ Password ไม่ถูกต้อง', confirmButtonText: 'ตกลง' });
