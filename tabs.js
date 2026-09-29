@@ -442,14 +442,24 @@ async function showAreaEvaluation() {
   }
   const form = SCHOOLS.find(s => s.id === SELECTED.id) || SELECTED;
   const checks = AREA_FORM_STATE.formTypes || [];
-  const types = ['แบบสอนสามัญ', 'แบบสอนสามัญควบคู่ศาสนาอิสลาม'];
+  const types = [
+    { label: 'สามัญศึกษา', value: 'แบบสอนสามัญ' },
+    { label: 'อิสลามควบคู่สามัญ', value: 'แบบสอนสามัญควบคู่ศาสนาอิสลาม' },
+    { label: 'การศึกษาสงเคราะห์', value: 'การศึกษาสงเคราะห์' }
+  ];
+  const formValue = String(form.form || '');
+  const isDefaultType = value => {
+    if (value === 'แบบสอนสามัญควบคู่ศาสนาอิสลาม') return formValue.includes('ควบคู่');
+    if (value === 'การศึกษาสงเคราะห์') return formValue.includes('สงเคราะห์');
+    return !formValue.includes('ควบคู่') && !formValue.includes('สงเคราะห์');
+  };
   wrap.innerHTML = `<div class="panel-head"><h2>🧭 แบบนิเทศทั่วไประดับพื้นที่</h2></div>
     <div class="note" style="background:#ecfeff;border-left:4px solid #0e7490">แบบนิเทศนี้เป็นเครื่องมือแยกสำหรับการนิเทศระดับพื้นที่ อ้างอิงคู่มือ หน้า 11–13 โดยข้อมูลจะบันทึกแยกจากแบบนิเทศเดิม</div>
     <div class="form-wrap area-form">
       <div class="grp"><div class="grp-h">1. ข้อมูลทั่วไป</div><div class="area-grid">
         ${areaTextField('schoolName','ชื่อโรงเรียน',form.name)}
         ${areaTextField('district','อำเภอ',form.dist)}
-        <div class="area-field"><span>รูปแบบการจัดการศึกษา</span><div class="area-checks">${types.map((v,i)=>`<label><input type="checkbox" data-area-type="${i}" ${checks.includes(v) || (!checks.length && String(form.form||'').includes(i ? 'ควบคู่' : 'สามัญ') && (i===1 ? String(form.form||'').includes('ควบคู่') : !String(form.form||'').includes('ควบคู่')))?'checked':''}> ${esc(v)}</label>`).join('')}</div></div>
+        <div class="area-field"><span>รูปแบบการจัดการศึกษา มี 3 รูปแบบ</span><div class="area-checks">${types.map((t,i)=>`<label><input type="checkbox" data-area-type="${i}" ${checks.includes(t.value) || (!checks.length && isDefaultType(t.value))?'checked':''}> ${esc(t.label)}</label>`).join('')}</div></div>
         ${areaTextField('gradeLevels','ระดับชั้นที่เปิดสอน','')}
         ${areaTextField('studentCount','จำนวนนักเรียน','')}
         ${areaTextField('teacherCount','จำนวนครู','')}
@@ -465,7 +475,7 @@ async function showAreaEvaluation() {
       <div class="area-actions"><button class="btn btn-primary" onclick="saveAreaEvaluation()">💾 บันทึกแบบนิเทศทั่วไประดับพื้นที่</button></div>
     </div><div class="form-wrap"><div class="grp"><div class="grp-h">ประวัติแบบนิเทศทั่วไประดับพื้นที่</div><div id="areaHistory" class="loading">กำลังโหลดประวัติ...</div></div></div>`;
   wrap.querySelectorAll('[data-area-field]').forEach(x=>x.addEventListener('input',()=>{AREA_FORM_STATE[x.dataset.areaField]=x.value; markFormDirty();}));
-  wrap.querySelectorAll('[data-area-type]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.formTypes=Array.from(wrap.querySelectorAll('[data-area-type]:checked')).map(c=>types[Number(c.dataset.areaType)]); markFormDirty();}));
+  wrap.querySelectorAll('[data-area-type]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.formTypes=Array.from(wrap.querySelectorAll('[data-area-type]:checked')).map(c=>types[Number(c.dataset.areaType)].value); markFormDirty();}));
   wrap.querySelectorAll('[data-area-score]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.ratings=AREA_FORM_STATE.ratings||{};AREA_FORM_STATE.ratings[x.dataset.areaScore]=x.value; markFormDirty();}));
   wrap.querySelectorAll('[data-area-note]').forEach(x=>x.addEventListener('input',()=>{AREA_FORM_STATE.notes=AREA_FORM_STATE.notes||{};AREA_FORM_STATE.notes[x.dataset.areaNote]=x.value; markFormDirty();}));
   const history = await post('getAreaEvaluations', SELECTED.id);
