@@ -1132,8 +1132,8 @@ async function loadSchool(id, options = {}) {
 }
 
 // -------- แผนที่ (Leaflet + GPS) --------
-function initPinBar() {
-  const card = $('#basicPinCard') || $('#pinCard');
+function initPinBar(targetId) {
+  const card = (targetId && $('#' + targetId)) || $('#basicPinCard') || $('#pinCard');
   if (!card) return;
   card.innerHTML = `<div class="pin-head"><b>📍 ที่ตั้งสถานศึกษา</b>
     <button type="button" class="btn btn-mini" id="gpsBtn">📌 หาพิกัดปัจจุบัน</button></div>
