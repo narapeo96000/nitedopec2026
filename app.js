@@ -1009,6 +1009,7 @@ async function loadSchool(id, options = {}) {
   const r = await post('getSchoolData', id);
   if (!r || !r.success) { toast((r||{}).message || 'โหลดข้อมูลไม่สำเร็จ', false); return; }
   SELECTED = r.data;
+  SELECTED_COORDS = SELECTED.coords || '';
   SCHOOLS = SCHOOLS.map(s => s.id === SELECTED.id ? { ...s, ...r.data } : s);
   STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
   EDIT_ROW = null;
