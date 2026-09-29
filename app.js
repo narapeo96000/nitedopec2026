@@ -332,7 +332,7 @@ function showLogin() {
         <div class="version-badge">📱 รุ่นพร้อมใช้งานภาคสนาม (Mobile Optimized)</div>
       </div>
 
-      <div class="card auth-card">
+      <div class="card home-login-card auth-card">
         <h4 class="text-center mb-3" style="color:#065f46;margin-top:0;">เข้าสู่ระบบ</h4>
         <div id="loginMsg" class="auth-msg"></div>
         <div class="sec-h" style="margin-top:8px">เลือกรูปแบบการนิเทศ</div>
@@ -362,7 +362,7 @@ function showLogin() {
         <p class="text-center mt-3 mb-0 small">ยังไม่มีบัญชี? <a href="javascript:void(0)" class="login-link" onclick="showRegister()">สมัครสมาชิก</a></p>
       </div>
 
-      <div class="card">
+      <div class="card home-stats-card">
         <div class="card-title"><h4>📊 สถิติระบบนิเทศออนไลน์</h4><span class="badge">อัปเดตอัตโนมัติ</span></div>
         <div class="stat-grid">
           <div class="stat-card"><div class="lbl">🏫 สถานศึกษา</div><div class="val" id="st_schools">—</div></div>
@@ -382,7 +382,7 @@ function showLogin() {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card home-directory-card">
         <div class="card-title"><h4>🏫 ทำเนียบสถานศึกษาเอกชน</h4><span class="badge" id="dirCount">0 รายการ</span></div>
         <label>🔍 ค้นหาโรงเรียน <span class="small text-muted">(กรองข้อมูลแบบทันที)</span></label>
         <input type="text" id="dirSearch" class="form-control" placeholder="พิมพ์ รหัส / ชื่อโรงเรียน / ที่อยู่ / ตำบล / อำเภอ..." autocomplete="off" oninput="renderDir()">
@@ -394,7 +394,7 @@ function showLogin() {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card home-docs-card">
         <div class="card-title"><h4>📄 เอกสารดาวน์โหลด</h4><span class="badge">แผนนิเทศ</span></div>
         <div class="doc-list">
           <a class="doc-item" href="https://docs.google.com/document/d/140PRrImcq3b0-jAIsFTAUGJMGB5IMHBd/export?format=pdf" target="_blank">
