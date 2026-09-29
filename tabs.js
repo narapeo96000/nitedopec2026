@@ -165,10 +165,19 @@ function buildTab1() {
       { k: "อำเภอ", value: SELECTED ? (SELECTED.dist||'') : '', p: "อำเภอ", dk: 'dist' },
       { k: "ตำบล", value: SELECTED ? (SELECTED.subdist||'') : '', p: "ตำบล", dk: 'subdist' },
       { k: "ที่อยู่", value: SELECTED ? (SELECTED.address||'') : '', p: "บ้านเลขที่ หมู่ ตำบล อำเภอ", dk: 'address' },
-      { k: "โทรศัพท์", value: SELECTED ? (SELECTED.phone||'') : '', p: "เบอร์ติดต่อ", dk: 'phone' },
-      { k: "รูปแบบการจัดการศึกษา", value: (SCHOOLS.find(x=>x.id===SELECTED.id)||{}).form || 'แบบสอนสามัญ', dk: 'form' }
+      { k: "โทรศัพท์", value: SELECTED ? (SELECTED.phone||'') : '', p: "เบอร์ติดต่อ", dk: 'phone' }
     ])}
     </div>
+    <div class="sec-h">รูปแบบการจัดการศึกษา มี 3 รูปแบบ</div>
+    <div class="edu-type-list">${[
+      'สามัญศึกษา', 'อิสลามควบคู่สามัญ', 'การศึกษาสงเคราะห์'
+    ].map((label, i) => {
+      const value = ['แบบสอนสามัญ', 'แบบสอนสามัญควบคู่ศาสนาอิสลาม', 'การศึกษาสงเคราะห์'][i];
+      const current = STATE.basic.form || (SCHOOLS.find(x=>x.id===SELECTED.id)||{}).form || 'แบบสอนสามัญ';
+      return `<label class="round edu-type"><input type="radio" name="educationForm" value="${esc(value)}" ${current === value ? 'checked' : ''}><span><b>${label}</b></span></label>`;
+    }).join('')}</div>
+    <div class="sec-h">ปักหมุด พิกัดแผนที่</div>
+    <div class="pin-coords basic-pin-row"><input id="basicCoords" placeholder="ละติจูด, ลองจิจูด" value="${esc(SELECTED_COORDS || (SELECTED && SELECTED.coords) || '')}"><button type="button" class="btn btn-mini" id="basicSetPin">บันทึกพิกัด</button></div>
     <div class="sep"></div>
     <div class="sec-h">ข้อมูล ณ วันที่นิเทศ</div>
     <div class="kv-grid">${renderKeyvals([
@@ -183,6 +192,10 @@ function buildTab1() {
     <div class="kv-grid">${ROUNDS.map(r => `<label class="round"><input type="radio" name="formType" value="${esc(r.v)}" ${r === ROUNDS[0] ? 'checked' : ''}><span><b>${esc(r.v)}</b><small>${esc(r.note)}</small></span></label>`).join('')}</div>
   </div>`;
   root.querySelectorAll('input[name=formType]').forEach(r => r.addEventListener('change', () => { STATE.evalMeta.formType = r.value; }));
+  root.querySelectorAll('input[name=educationForm]').forEach(r => r.addEventListener('change', () => {
+    STATE.basic.form = r.value;
+    if (typeof markFormDirty === 'function') markFormDirty();
+  }));
   root.querySelectorAll('.kv-v').forEach(x => {
     const dk = x.closest('label').dataset.key;
     x.addEventListener('input', () => {
@@ -190,6 +203,19 @@ function buildTab1() {
       if (dk === 'name') { /* แสดงผลเมื่อบันทึกแล้ว */ }
     });
   });
+  const basicPin = root.querySelector('#basicSetPin');
+  if (basicPin) basicPin.onclick = async () => {
+    const input = root.querySelector('#basicCoords');
+    const coords = input ? input.value.trim() : '';
+    if (!coords) { toast('กรุณาระบุพิกัด', false); return; }
+    if (!SELECTED) { toast('กรุณาเลือกสถานศึกษาก่อน', false); return; }
+    const r = await post('saveSchoolPin', { id: SELECTED.id, coords });
+    if (r && r.success) {
+      SELECTED_COORDS = coords;
+      SELECTED.coords = coords;
+      toast(r.message || 'บันทึกพิกัดเรียบร้อย', true);
+    } else toast((r || {}).message || 'บันทึกพิกัดไม่สำเร็จ', false);
+  };
   // ย้าย: ใช้ updateScoreBar display ได้ (bar อยู่ด้านบนทุกแท็บ)
 }
 
