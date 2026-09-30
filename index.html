@@ -112,6 +112,20 @@ a{color:var(--pri)}
 .landing th,.landing td{padding:10px 8px;text-align:left;border-bottom:1px solid #eef5f3;vertical-align:top;word-break:break-word;overflow-wrap:anywhere}
 .landing thead th{color:#b45309;background:#fef3c7;font-weight:600}
 .landing .latest-table thead th{color:#1d4ed8;background:#dbeafe}
+.landing .addr-table th:first-child{width:25%}
+.landing .addr-table th:last-child{width:22%}
+.dir-school{display:flex;gap:8px;align-items:flex-start}
+.dir-school>div{min-width:0}
+.dir-school-icon{flex:none;font-size:20px}
+.dir-school small{display:block}
+.dir-school-code{color:#475569;font-variant-numeric:tabular-nums}
+.dir-count-heading{display:inline-block;white-space:nowrap}
+.dir-counts{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.dir-count{display:inline-flex;align-items:center;gap:4px;padding:4px 6px;border-radius:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dir-staff{background:#dbeafe;color:#1e40af}
+.dir-students{background:#dcfce7;color:#166534}
+.dir-count-divider{color:#64748b}
+.dir-count-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .landing .lv{display:inline-block;border-radius:999px;padding:3px 12px;font-size:.8rem;font-weight:700;white-space:nowrap}
 .landing .lv-green{background:#d1fae5;color:#065f46}
 .landing .lv-blue{background:#dbeafe;color:#1e40af}
@@ -149,6 +163,9 @@ a{color:var(--pri)}
   .landing .addr-table td[data-label]::before{content:attr(data-label);display:inline-block;min-width:88px;color:#64748b;font-weight:600;font-size:.68rem;vertical-align:top;margin-right:4px}
   .landing .addr-table td:first-child{border-bottom:1px dashed #d5e0ea;padding-bottom:8px;margin-bottom:6px}
   .landing .addr-table td:first-child::before{display:none}
+  .landing .addr-table .dir-count-label{position:static;width:auto;height:auto;overflow:visible;clip-path:none}
+  .landing .addr-table .dir-counts{padding-top:4px;font-size:.8rem}
+  .landing .addr-table .dir-count{padding:6px 8px}
   .landing .suggest-item{padding:12px 14px}
   .landing .app-footer{font-size:.72rem}
 }
@@ -514,6 +531,12 @@ textarea.note{width:100%;resize:vertical}
   .landing .suggest-item:hover,.landing .suggest-item.active{background:#134e4a}
   .landing .oppts{color:#e2e8f0}
   .landing th,.landing td{border-color:#334155}
+  .landing .addr-table tbody tr{background:#1e293b;border-color:#475569}
+  .landing .addr-table .text-muted,.landing .addr-table td[data-label]::before{color:#94a3b8}
+  .dir-school-code{color:#cbd5e1}
+  .dir-staff{background:#1e3a8a;color:#dbeafe}
+  .dir-students{background:#14532d;color:#dcfce7}
+  .dir-count-divider{color:#94a3b8}
   .landing thead th{background:#453a20;color:#fcd34d}
   .landing .latest-table thead th{background:#1e3a5f;color:#93c5fd}
   .landing .stat-card .val{color:#5eead4}
