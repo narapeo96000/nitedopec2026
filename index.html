@@ -71,8 +71,12 @@ a{color:var(--pri)}
 .landing .home-stats-card .card-title h4{color:#92400e;border-left-color:#d97706}
 .landing .home-directory-card{border-top:5px solid #2563eb;background:linear-gradient(180deg,#eff6ff 0%,#fff 35%)}
 .landing .home-directory-card .card-title h4{color:#1e40af;border-left-color:#2563eb}
-.landing .home-docs-card{border-top:5px solid #7c3aed;background:linear-gradient(180deg,#f5f3ff 0%,#fff 35%)}
+.landing .home-docs-card{margin-top:16px;border-top:5px solid #7c3aed;background:linear-gradient(180deg,#f5f3ff 0%,#fff 35%)}
 .landing .home-docs-card .card-title h4{color:#6d28d9;border-left-color:#7c3aed}
+.landing .home-docs-card .doc-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.landing .home-docs-card .doc-item{min-height:56px;min-width:0}
+.landing .home-docs-card .doc-item:focus-visible{outline:3px solid #7c3aed;outline-offset:3px}
+@media (max-width:600px){.landing .home-docs-card .doc-list{grid-template-columns:1fr}}
 .landing .info-box{background:#f0fdfa;border:1px solid #ccfbf1;border-radius:12px;padding:10px 14px;margin-top:8px}
 .landing .oppts{color:#0f172a}
 /* buttons */
@@ -574,7 +578,7 @@ textarea.note{width:100%;resize:vertical}
 </head>
 <body>
 <div id="app"></div>
-<script src="app.js?v=0d3dbf3"></script>
+<script src="app.js?v=20260930-downloads"></script>
 <script src="render.js"></script>
 <script src="tabs.js"></script>
 </body>
