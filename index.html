@@ -116,16 +116,33 @@ a{color:var(--pri)}
 .landing th,.landing td{padding:10px 8px;text-align:left;border-bottom:1px solid #eef5f3;vertical-align:top;word-break:break-word;overflow-wrap:anywhere}
 .landing thead th{color:#b45309;background:#fef3c7;font-weight:600}
 .landing .latest-table thead th{color:#1d4ed8;background:#dbeafe}
-.landing .addr-table th:first-child{width:25%}
-.landing .addr-table th:last-child{width:22%}
-.dir-school{display:flex;gap:8px;align-items:flex-start}
+.landing .home-directory-card .card-title{flex-wrap:wrap}
+.landing .home-directory-card .badge{background:#dbeafe;color:#1e40af}
+.landing .home-directory-card .table-wrap{overflow-x:auto;margin-top:14px;border:1px solid #dbe5f1;border-radius:12px}
+.landing .addr-table{table-layout:fixed;min-width:780px;background:#fff;font-size:13px}
+.landing .addr-table th:first-child{width:26%}
+.landing .addr-table th:nth-child(2){width:22%}
+.landing .addr-table th:nth-child(3),.landing .addr-table th:nth-child(4){width:11%}
+.landing .addr-table th:nth-child(5){width:16%}
+.landing .addr-table th:last-child{width:14%}
+.landing .addr-table th,.landing .addr-table td{padding:14px 10px;line-height:1.65;word-break:normal;overflow-wrap:break-word;vertical-align:middle;border-bottom:1px solid #e2e8f0}
+.landing .addr-table thead th{background:#eaf2ff;color:#1e40af;font-weight:700;border-bottom:2px solid #c7d9f5}
+.landing .addr-table tbody tr{background:#fff}
+.landing .addr-table tbody tr:nth-child(even){background:#f8fafc}
+.landing .addr-table tbody tr:hover{background:#eff6ff}
+.landing .addr-table tbody tr:last-child td{border-bottom:0}
+.landing .addr-table td[data-label="โทรศัพท์"]{font-variant-numeric:tabular-nums;overflow-wrap:normal}
+.landing .addr-table td[colspan]{padding:24px 12px;text-align:center}
+.dir-school{display:flex;gap:10px;align-items:flex-start}
 .dir-school>div{min-width:0}
-.dir-school-icon{flex:none;font-size:20px}
-.dir-school small{display:block}
-.dir-school-code{color:#475569;font-variant-numeric:tabular-nums}
+.dir-school-icon{display:flex;align-items:center;justify-content:center;width:32px;height:36px;flex:none;font-size:19px;background:#eff6ff;border:1px solid #dbeafe;border-radius:9px}
+.dir-school b{display:block;font-size:14px;line-height:1.6}
+.dir-school small{display:block;margin-top:3px;font-size:12px;line-height:1.55}
+.dir-school-code{color:#475569;font-variant-numeric:tabular-nums;white-space:nowrap}
 .dir-count-heading{display:block;white-space:nowrap}
-.dir-counts{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
-.dir-count{display:inline-flex;align-items:center;gap:4px;padding:4px 6px;border-radius:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dir-counts{display:flex;flex-direction:column;align-items:stretch;gap:6px;max-width:100px}
+.dir-count{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dir-count b{margin-left:auto;font-size:14px}
 .dir-staff{background:#dbeafe;color:#1e40af}
 .dir-students{background:#dcfce7;color:#166534}
 .dir-count-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
@@ -158,19 +175,27 @@ a{color:var(--pri)}
   .landing label{font-size:.86rem}
   .landing table{font-size:.72rem}
   .landing th,.landing td{padding:7px 4px}
+  .landing .suggest-item{padding:12px 14px}
+  .landing .app-footer{font-size:.72rem}
+}
+/* School directory cards keep the six fields readable on phones and tablets. */
+@media (max-width:760px){
+  .landing .home-directory-card .table-wrap{border:0;border-radius:0;overflow:visible}
+  .landing .addr-table{min-width:0;background:transparent;font-size:14px}
   .landing .addr-table thead{display:none}
   .landing .addr-table,.landing .addr-table tbody,.landing .addr-table tr,.landing .addr-table td{display:block;width:100%}
   .landing .addr-table tbody{display:flex;flex-direction:column;gap:12px}
-  .landing .addr-table tr{border:1px solid #d5e0ea;border-radius:14px;padding:10px 12px;background:#fff;box-shadow:0 2px 8px rgba(6,95,70,.05)}
-  .landing .addr-table td{padding:4px 0}
-  .landing .addr-table td[data-label]::before{content:attr(data-label);display:inline-block;min-width:88px;color:#64748b;font-weight:600;font-size:.68rem;vertical-align:top;margin-right:4px}
-  .landing .addr-table td:first-child{border-bottom:1px dashed #d5e0ea;padding-bottom:8px;margin-bottom:6px}
-  .landing .addr-table td:first-child::before{display:none}
+  .landing .addr-table tbody tr{border:1px solid #d5e0ea;border-radius:14px;padding:14px;background:#fff;box-shadow:0 2px 8px rgba(6,95,70,.05)}
+  .landing .addr-table tbody tr:nth-child(even),.landing .addr-table tbody tr:hover{background:#fff}
+  .landing .addr-table td{padding:6px 0;border-bottom:0}
+  .landing .addr-table td[data-label]{display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px}
+  .landing .addr-table td[data-label]::before{content:attr(data-label);color:#64748b;font-weight:600;font-size:13px}
+  .landing .addr-table td:first-child:not([colspan]){border-bottom:1px solid #e2e8f0;padding:0 0 12px;margin-bottom:6px}
+  .landing .addr-table td[colspan]{padding:14px 0;text-align:center}
+  .landing .addr-table .dir-school b{font-size:15px}
   .landing .addr-table .dir-count-label{position:static;width:auto;height:auto;overflow:visible;clip-path:none}
-  .landing .addr-table .dir-counts{padding-top:4px;font-size:.8rem}
-  .landing .addr-table .dir-count{padding:6px 8px}
-  .landing .suggest-item{padding:12px 14px}
-  .landing .app-footer{font-size:.72rem}
+  .landing .addr-table .dir-counts{max-width:none;margin-top:8px;padding-top:12px;border-top:1px solid #e2e8f0;gap:8px}
+  .landing .addr-table .dir-count{padding:8px 12px}
 }
 /* ---------- SHELL ---------- */
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#052e2b;color:#ecfeff;padding:10px 16px;position:sticky;top:0;z-index:50;flex-wrap:wrap}
@@ -534,8 +559,16 @@ textarea.note{width:100%;resize:vertical}
   .landing .suggest-item:hover,.landing .suggest-item.active{background:#134e4a}
   .landing .oppts{color:#e2e8f0}
   .landing th,.landing td{border-color:#334155}
+  .landing .home-directory-card .badge{background:#1e3a8a;color:#dbeafe}
+  .landing .home-directory-card .table-wrap{border-color:#475569}
+  .landing .addr-table{background:transparent}
+  .landing .addr-table thead th{background:#172554;color:#bfdbfe;border-color:#334155}
+  .landing .addr-table th,.landing .addr-table td,.landing .addr-table td:first-child:not([colspan]),.landing .addr-table .dir-counts{border-color:#334155}
   .landing .addr-table tbody tr{background:#1e293b;border-color:#475569}
+  .landing .addr-table tbody tr:nth-child(even){background:#172033}
+  .landing .addr-table tbody tr:hover{background:#1e3a5f}
   .landing .addr-table .text-muted,.landing .addr-table td[data-label]::before{color:#94a3b8}
+  .dir-school-icon{background:#172554;border-color:#1e3a8a}
   .dir-school-code{color:#cbd5e1}
   .dir-staff{background:#1e3a8a;color:#dbeafe}
   .dir-students{background:#14532d;color:#dcfce7}
