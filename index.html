@@ -216,6 +216,21 @@ a{color:var(--pri)}
 }
 .side-card h4{font-size:14px;color:#065f46;margin-bottom:8px}
 .side-card select{width:100%;margin-bottom:10px}
+.side-school-picker{margin-bottom:12px;min-width:0}
+.side-school-label{display:block;font-size:12px;color:var(--mut);margin-bottom:6px}
+.side-school-search-row{display:flex;gap:5px}
+.side-school-search-row input{width:100%;min-width:0;min-height:44px;font-size:13px;padding:8px}
+#sidebarSchoolSearch::-webkit-search-cancel-button{display:none;-webkit-appearance:none;appearance:none}
+.side-school-clear{flex:none;width:36px;min-height:44px;border:1px solid var(--bord);border-radius:8px;background:var(--card);color:var(--mut)}
+.side-school-results{max-height:270px;overflow-y:auto;overscroll-behavior:contain;margin-top:6px;border:1px solid var(--bord);border-radius:10px;background:var(--card)}
+.side-school-results[hidden]{display:none}
+.side-school-count{font-size:12px;color:var(--mut);padding:8px 10px;background:var(--bg)}
+.side-school-option{display:block;width:100%;min-height:56px;padding:10px;text-align:left;border:0;border-bottom:1px solid var(--bord);background:var(--card);color:var(--ink);line-height:1.5;overflow-wrap:break-word}
+.side-school-option:last-child{border-bottom:0}
+.side-school-option b{display:block;font-size:13px}
+.side-school-option small{display:block;color:var(--mut);font-size:11px}
+.side-school-option:hover,.side-school-option:focus-visible,.side-school-option.selected{background:#ecfdf5;box-shadow:inset 3px 0 #059669}
+.side-school-current{font-size:12px;line-height:1.6;white-space:pre-line;color:var(--mut);margin-top:8px;overflow-wrap:break-word}
 .pin-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}
 .pin-tools{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .map{height:170px;border-radius:10px;border:1px solid var(--bord);z-index:1}
@@ -454,6 +469,10 @@ textarea.note{width:100%;resize:vertical}
   .hamburger{flex:0 0 auto;min-width:44px;min-height:44px}
   .side{top:52px;padding:10px 12px calc(18px + env(safe-area-inset-bottom))}
   .side-card select{min-height:46px;font-size:15px}
+  .side-school-search-row input{font-size:16px}
+  .side-school-clear{width:44px}
+  .side-school-option b{font-size:15px}
+  .side-school-option small{font-size:12px}
   .side-actions{position:sticky;bottom:0;z-index:2;margin:10px -12px 0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);border-top:1px solid var(--bord);display:flex;flex-direction:column;gap:6px}
   .side-actions .btn{width:100%;min-height:44px;margin-top:0!important}
   .nav{flex-direction:column;gap:6px;margin-top:12px}
@@ -516,6 +535,7 @@ textarea.note{width:100%;resize:vertical}
   input,select,textarea{background:#1e293b;color:#e2e8f0;border-color:#475569}
   .topbar{background:#020617}
   .side{background:#1e293b;border-color:#334155}
+  .side-school-option:hover,.side-school-option:focus-visible,.side-school-option.selected{background:#134e4a}
   .tb-nav{color:#e2e8f0}
   .tb-nav:hover{background:#334155}
   .tb-nav:not(.active)[data-target="tab-1"],.tb-nav:not(.active)[data-target="tab-2"],.tb-nav:not(.active)[data-target="tab-3"],.tb-nav:not(.active)[data-target="tab-4"],.tb-nav:not(.active)[data-target="tab-5"],.tb-nav:not(.active)[data-target="tab-6"],.tb-nav:not(.active)[data-target="tab-7"]{background:#172554;color:#bfdbfe}
@@ -609,7 +629,7 @@ textarea.note{width:100%;resize:vertical}
 </head>
 <body>
 <div id="app"></div>
-<script src="app.js?v=20260930-upload-drive"></script>
+<script src="app.js?v=20260930-sidebar-search"></script>
 <script src="render.js"></script>
 <script src="tabs.js?v=20260930-upload-drive"></script>
 </body>

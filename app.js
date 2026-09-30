@@ -691,6 +691,108 @@ function logout() {
 // ============================================================
 // หน้าหลัก / Dashboard
 // ============================================================
+function sidebarSchoolPickerHtml() {
+  return `<div id="sidebarSchoolPicker" class="side-school-picker">
+    <label class="side-school-label" for="sidebarSchoolSearch">ค้นหาสถานศึกษา</label>
+    <div class="side-school-search-row">
+      <input type="search" id="sidebarSchoolSearch" placeholder="รหัส / ชื่อ / อำเภอ / ตำบล" autocomplete="off" aria-controls="sidebarSchoolResults" aria-describedby="sidebarSchoolCurrent" disabled>
+      <button type="button" class="side-school-clear" aria-label="ล้างคำค้นสถานศึกษา" title="ล้างคำค้น" disabled>✕</button>
+    </div>
+    <div id="sidebarSchoolResults" class="side-school-results" hidden></div>
+    <div id="sidebarSchoolCurrent" class="side-school-current" aria-live="polite">ยังไม่ได้เลือกสถานศึกษา</div>
+    <input type="hidden" id="schoolSelect">
+  </div>`;
+}
+
+function filterSidebarSchools(query) {
+  const words = String(query || '').toLocaleLowerCase('th').trim().split(/\s+/).filter(Boolean);
+  return SCHOOLS.filter(s => {
+    const text = [s.id, s.name, s.dist, s.subdist, s.form].join(' ').toLocaleLowerCase('th');
+    return words.every(word => text.includes(word));
+  });
+}
+
+function syncSidebarSchoolPicker(id) {
+  const school = SCHOOLS.find(s => String(s.id) === String(id || ''));
+  const input = $('#sidebarSchoolSearch');
+  const selected = $('#schoolSelect');
+  const current = $('#sidebarSchoolCurrent');
+  const results = $('#sidebarSchoolResults');
+  if (input) input.value = school ? school.name : '';
+  if (selected) selected.value = school ? school.id : '';
+  if (current) current.textContent = school ? 'เลือกอยู่: ' + school.name + '\nรหัส ' + school.id : 'ยังไม่ได้เลือกสถานศึกษา';
+  if (results) results.hidden = true;
+}
+
+function initSidebarSchoolPicker() {
+  const host = $('#sidebarSchoolPicker');
+  if (!host) return;
+  const input = host.querySelector('#sidebarSchoolSearch');
+  const results = host.querySelector('#sidebarSchoolResults');
+  const clear = host.querySelector('.side-school-clear');
+  const render = () => {
+    const list = filterSidebarSchools(input.value);
+    results.innerHTML = `<div class="side-school-count" role="status">${list.length ? 'พบ ' + list.length + ' สถานศึกษา' : 'ไม่พบสถานศึกษา ลองค้นหาด้วยคำอื่น'}</div>` + list.map(s => `
+      <button type="button" class="side-school-option ${SELECTED && String(SELECTED.id) === String(s.id) ? 'selected' : ''}" data-school-id="${esc(s.id)}">
+        <b>${esc(s.name)}</b><small>รหัส ${esc(s.id)}</small><small>${esc([s.dist, s.subdist].filter(Boolean).join(' · '))}</small>
+      </button>`).join('');
+    results.hidden = false;
+  };
+  input.oninput = render;
+  input.onfocus = () => { input.select(); render(); };
+  clear.onclick = () => { input.value = ''; input.focus(); render(); };
+  host.onfocusout = e => {
+    if (host.contains(e.relatedTarget)) return;
+    // Allow touch browsers to deliver the result button's click before hiding it.
+    setTimeout(() => { if (host.isConnected && !host.contains(document.activeElement)) results.hidden = true; }, 200);
+  };
+  host.onkeydown = e => {
+    if (e.key === 'Escape') { e.preventDefault(); input.focus(); results.hidden = true; return; }
+    if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return;
+    if (e.target === input) {
+      e.preventDefault();
+      if (results.hidden) render();
+      const buttons = results.querySelectorAll('button');
+      if (e.key === 'Enter' && buttons.length === 1) buttons[0].click();
+      else if (buttons.length) buttons[e.key === 'ArrowUp' ? buttons.length - 1 : 0].focus();
+    } else if (e.key !== 'Enter' && e.target.matches('[data-school-id]')) {
+      e.preventDefault();
+      const buttons = Array.from(results.querySelectorAll('button'));
+      const next = buttons.indexOf(e.target) + (e.key === 'ArrowDown' ? 1 : -1);
+      if (next >= 0 && next < buttons.length) buttons[next].focus(); else input.focus();
+    }
+  };
+  results.onclick = async e => {
+    const button = e.target.closest('[data-school-id]');
+    if (!button || host.dataset.loading === 'true') return;
+    const id = button.dataset.schoolId;
+    if (!INSPECTION_MODE) { startInspection(); toast('กรุณาเลือกรูปแบบการนิเทศก่อน', false); return; }
+    if (SELECTED && String(SELECTED.id) === id && $('#basicPinCard')) {
+      syncSidebarSchoolPicker(id);
+      if ($('#sidebar')) $('#sidebar').classList.remove('open');
+      return;
+    }
+    host.dataset.loading = 'true';
+    input.disabled = true;
+    clear.disabled = true;
+    results.hidden = true;
+    try {
+      const loaded = await loadSchool(id);
+      if (loaded && $('#sidebar')) $('#sidebar').classList.remove('open');
+    } finally {
+      host.dataset.loading = 'false';
+      if (host.isConnected) {
+        input.disabled = !SCHOOLS.length;
+        clear.disabled = !SCHOOLS.length;
+        syncSidebarSchoolPicker(SELECTED ? SELECTED.id : '');
+      }
+    }
+  };
+  input.disabled = !SCHOOLS.length;
+  clear.disabled = !SCHOOLS.length;
+  syncSidebarSchoolPicker(SELECTED ? SELECTED.id : '');
+}
+
 async function startDash() {
   destroyPinMaps();
   const app = $('#app');
@@ -709,7 +811,7 @@ async function startDash() {
       <div class="side-close"><button onclick="toggleSidebar()">✕ ปิด</button></div>
       <div class="side-card">
         <h4>เลือกสถานศึกษา</h4>
-        <select id="schoolSelect" onchange="loadSchool(this.value)"><option value="">— เลือกสถานศึกษา —</option></select>
+        ${sidebarSchoolPickerHtml()}
         <div id="pinCard"></div>
         <div class="side-actions">
           <button class="btn" id="saveFullBtn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
@@ -760,8 +862,7 @@ async function startDash() {
   const r = await post('getSchoolList');
   if (r && r.success) {
     SCHOOLS = (r.data || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const sel = $('#schoolSelect');
-    sel.innerHTML = '<option value="">— เลือกสถานศึกษา —</option>' + SCHOOLS.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+    initSidebarSchoolPicker();
     if (!SCHOOLS.length) $('#pinCard').innerHTML = `<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ <br>ผู้ดูแลสามารถพิมพ์ข้อมูลลงชีต ADDR_SCHOOL (เริ่มแถวที่ 2)</div>`;
   } else {
     $('#pinCard').innerHTML = `<div class="empty">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อโรงเรียนได้')}</div>`;
@@ -793,7 +894,7 @@ async function startDashWithSchool(schoolId) {
       <div class="side-close"><button onclick="toggleSidebar()">✕ ปิด</button></div>
       <div class="side-card">
         <h4>เลือกสถานศึกษา</h4>
-        <select id="schoolSelect" onchange="loadSchool(this.value)"><option value="">— เลือกสถานศึกษา —</option></select>
+        ${sidebarSchoolPickerHtml()}
         <div id="pinCard"></div>
         <div class="side-actions">
           <button class="btn" id="saveFullBtn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
@@ -844,8 +945,7 @@ async function startDashWithSchool(schoolId) {
   const r = await post('getSchoolList');
   if (r && r.success) {
     SCHOOLS = (r.data || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const sel = $('#schoolSelect');
-    sel.innerHTML = '<option value="">— เลือกสถานศึกษา —</option>' + SCHOOLS.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+    initSidebarSchoolPicker();
     if (!SCHOOLS.length) $('#pinCard').innerHTML = `<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ</div>`;
   } else {
     $('#pinCard').innerHTML = `<div class="empty">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อโรงเรียนได้')}</div>`;
@@ -1013,9 +1113,7 @@ function startInspection() {
     </div>
     <div id="inspectionSchoolStep"></div>
   `;
-  // sync sidebar dropdown
-  const sel = $('#schoolSelect');
-  if (sel) sel.value = '';
+  syncSidebarSchoolPicker('');
   if (preselectedMode) chooseInspectionMode(preselectedMode);
 }
 
@@ -1116,16 +1214,16 @@ function resumeDraft(schoolName) {
 
 async function loadSchool(id, options = {}) {
   if (!options.skipConfirm && typeof confirmDiscardChanges === 'function' && SELECTED && id !== SELECTED.id && !confirmDiscardChanges()) {
-    const sel = $('#schoolSelect');
-    if (sel) sel.value = SELECTED.id;
-    return;
+    syncSidebarSchoolPicker(SELECTED.id);
+    return false;
   }
-  if (!id) { SELECTED = null; if (typeof setFormClean === 'function') setFormClean(); return; }
+  if (!id) { SELECTED = null; syncSidebarSchoolPicker(''); if (typeof setFormClean === 'function') setFormClean(); return false; }
   const r = await post('getSchoolData', id);
-  if (!r || !r.success) { toast((r||{}).message || 'โหลดข้อมูลไม่สำเร็จ', false); return; }
+  if (!r || !r.success) { syncSidebarSchoolPicker(SELECTED ? SELECTED.id : ''); toast((r||{}).message || 'โหลดข้อมูลไม่สำเร็จ', false); return false; }
   SELECTED = r.data;
   SELECTED_COORDS = SELECTED.coords || '';
   SCHOOLS = SCHOOLS.map(s => s.id === SELECTED.id ? { ...s, ...r.data } : s);
+  syncSidebarSchoolPicker(SELECTED.id);
   STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
   EDIT_ROW = null;
   buildAll();
@@ -1136,6 +1234,7 @@ async function loadSchool(id, options = {}) {
   if (!options.skipDraft && INSPECTION_MODE !== 'general') restoreDraftIfAny();
   if (INSPECTION_MODE === 'general') showAreaEvaluation();
   toast('เลือก ' + SELECTED.name + ' แล้ว', true);
+  return true;
 }
 
 // -------- แผนที่ (Leaflet + GPS) --------
