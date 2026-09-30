@@ -620,33 +620,72 @@ function uploadFolder() {
 }
 // เรียกใช้ครั้งเดียวจาก Apps Script Editor เพื่อขออนุมัติสิทธิ์ Google Drive
 function authorizeDriveAccess() {
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, ['https://www.googleapis.com/auth/drive']);
   const folder = uploadFolder();
-  return { success: true, folderId: folder.getId(), folderName: folder.getName() };
+  const result = { success: true, folderId: folder.getId(), folderName: folder.getName(), driveScope: 'granted' };
+  console.log(JSON.stringify(result));
+  return result;
 }
-function schoolFolder(schoolId) {
+// เรียกจาก Editor เท่านั้น: ตรวจการสร้างโฟลเดอร์/ไฟล์ด้วยข้อมูลทดสอบ แล้วนำไปไว้ในถังขยะ
+function verifyUploadAccess() {
+  authorizeDriveAccess();
+  let probe;
+  try {
+    probe = uploadFolder().createFolder('_permission-check-' + Utilities.getUuid());
+    const file = probe.createFile(Utilities.newBlob('OPEC upload permission check', 'text/plain', 'permission-check.txt'));
+    const result = { success: file.getSize() > 0, createFolder: true, createFile: true };
+    console.log(JSON.stringify(result));
+    return result;
+  } finally {
+    if (probe) probe.setTrashed(true);
+  }
+}
+function driveUploadError(error) {
+  const message = String(error && error.message || error || 'ไม่ทราบสาเหตุ');
+  if (/googleapis\.com\/auth\/drive|Authorization is required|อนุญาตให้เรียกใช้ DriveApp/i.test(message)) {
+    return { success: false, code: 'DRIVE_AUTH_REQUIRED', message: 'บัญชีผู้เผยแพร่ระบบยังไม่ได้อนุญาตสิทธิ์ Google Drive สำหรับจัดเก็บไฟล์ กรุณาแจ้งผู้ดูแลให้เรียกใช้ authorizeDriveAccess ใน Apps Script และอนุญาตสิทธิ์ Drive ก่อนลองใหม่' };
+  }
+  return { success: false, code: 'DRIVE_UPLOAD_ERROR', message: 'เข้าถึงไฟล์หลักฐานไม่สำเร็จ: ' + message };
+}
+function schoolFolder(schoolId, createIfMissing) {
   const base = uploadFolder();
   const it = base.getFoldersByName(schoolId);
-  return it.hasNext() ? it.next() : base.createFolder(schoolId);
+  if (it.hasNext()) return it.next();
+  if (!createIfMissing) return null;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const existing = base.getFoldersByName(schoolId);
+    return existing.hasNext() ? existing.next() : base.createFolder(schoolId);
+  } finally {
+    lock.releaseLock();
+  }
 }
 function getUploads(payload) {
   const p = (typeof payload === 'object' && payload !== null) ? payload : {};
   const id = String(p.schoolId || '').trim();
   if (!id) return { success: false, message: 'ไม่พบรหัสโรงเรียน' };
-  const list = [];
-  const it = schoolFolder(id).getFiles();
-  while (it.hasNext()) {
-    const f = it.next();
-    list.push({
-      id: f.getId(),
-      name: f.getName(),
-      sizeKb: Math.max(1, Math.round(f.getSize() / 1024)),
-      date: formatDate(f.getDateCreated()),
-      mime: f.getMimeType(),
-      urll: f.getUrl(),
-      dl: f.getDownloadUrl()
-    });
+  try {
+    const folder = schoolFolder(id, false);
+    if (!folder) return { success: true, data: [] };
+    const list = [];
+    const it = folder.getFiles();
+    while (it.hasNext()) {
+      const f = it.next();
+      list.push({
+        id: f.getId(),
+        name: f.getName(),
+        sizeKb: Math.max(1, Math.round(f.getSize() / 1024)),
+        date: formatDate(f.getDateCreated()),
+        mime: f.getMimeType(),
+        urll: f.getUrl(),
+        dl: f.getDownloadUrl()
+      });
+    }
+    return { success: true, data: list.sort((a, b) => a.date < b.date ? 1 : -1) };
+  } catch (error) {
+    return driveUploadError(error);
   }
-  return { success: true, data: list.sort((a, b) => a.date < b.date ? 1 : -1) };
 }
 function uploadFile(payload) {
   const p = (typeof payload === 'object' && payload !== null) ? payload : {};
@@ -655,20 +694,35 @@ function uploadFile(payload) {
   const data64 = String(p.data64 || '').replace(/\s+/g, '');
   if (!id) return { success: false, message: 'ไม่พบรหัสโรงเรียน' };
   if (!filename || !data64) return { success: false, message: 'ไม่พบข้อมูลไฟล์' };
+  const allowedTypes = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', pdf: 'application/pdf',
+    doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  };
+  const extension = filename.split('.').pop().toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(allowedTypes, extension)) {
+    return { success: false, message: 'รองรับเฉพาะ JPG, JPEG, PNG, PDF, Word (.doc/.docx) และ Excel (.xls/.xlsx)' };
+  }
+  const mime = String(p.mime || '').toLowerCase().split(';')[0].trim();
+  if (mime && mime !== 'application/octet-stream' && mime !== allowedTypes[extension] && !(extension === 'jpg' && mime === 'image/jpg')) {
+    return { success: false, message: 'ชนิดไฟล์ไม่ตรงกับนามสกุล กรุณาเลือกไฟล์ต้นฉบับอีกครั้ง' };
+  }
+  const maxBytes = 8 * 1024 * 1024;
+  if (data64.length > Math.ceil(maxBytes / 3) * 4) return { success: false, message: 'ไฟล์ใหญ่เกิน 8MB' };
   // ตรวจสอบว่าโรงเรียนมีในระบบ
   const inList = getSchoolList().data || [];
   let found = false;
   for (let i = 0; i < inList.length; i++) { if (inList[i].id === id) { found = true; break; } }
   if (!found) return { success: false, message: 'ไม่พบรหัสโรงเรียนในข้อมูล' };
   try {
-    const maxBytes = 8 * 1024 * 1024; // จำกัด ~8MB
     const bytes = Utilities.base64Decode(data64);
+    if (!bytes.length) return { success: false, message: 'ไฟล์ว่างหรือข้อมูลไฟล์ไม่ถูกต้อง' };
     if (bytes.length > maxBytes) return { success: false, message: 'ไฟล์ใหญ่เกิน 8MB' };
-    const blob = Utilities.newBlob(bytes, p.mime || 'application/octet-stream', filename);
-    const file = schoolFolder(id).createFile(blob);
+    const blob = Utilities.newBlob(bytes, allowedTypes[extension], filename);
+    const file = schoolFolder(id, true).createFile(blob);
     return { success: true, message: 'อัปโหลด "' + filename + '" เรียบร้อยแล้ว', file: { id: file.getId(), name: file.getName() } };
   } catch (e) {
-    return { success: false, message: 'อัปโหลดไม่สำเร็จ: ' + e.message };
+    return driveUploadError(e);
   }
 }
 function deleteUpload(payload) {

@@ -203,7 +203,7 @@ function compressImage(file, maxW = 1600, quality = 0.7) {
       c.width = w; c.height = h;
       c.getContext('2d').drawImage(img, 0, 0, w, h);
       c.toBlob(b => {
-        if (b && b.size < file.size) resolve(new File([b], file.name, { type: 'image/jpeg' }));
+        if (b && b.size < file.size) resolve(new File([b], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
         else resolve(file);
       }, 'image/jpeg', quality);
     };
