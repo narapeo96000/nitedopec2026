@@ -636,26 +636,46 @@ async function aiDraftAgreement() {
 async function showUploadsPanel() {
   switchTab('tab-files');
   const wrap = $('#filesWrap');
+  if (!wrap) return;
   if (!SELECTED) { wrap.innerHTML = `<div class="empty">กรุณาเลือกสถานศึกษา เพื่อจัดการไฟล์หลักฐาน</div>`; return; }
+  const schoolId = String(SELECTED.id);
+  const existingInput = $('#filePick');
+  if (wrap.dataset.schoolId === schoolId && existingInput && existingInput.dataset.uploading === 'true') return;
+  wrap.dataset.schoolId = schoolId;
   wrap.innerHTML = `<div class="form-wrap">
     <div class="grp">
       <div class="grp-h">📎 ไฟล์หลักฐานการนิเทศ — ${esc(SELECTED.name)}</div>
       <div class="upload-row">
         <input type="file" id="filePick" multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx">
-        <button class="btn btn-primary" onclick="doUpload()">⬆️ อัปโหลด</button>
+        <button id="uploadButton" class="btn btn-primary" onclick="doUpload()">⬆️ อัปโหลด</button>
       </div>
       <div class="hint" style="margin:6px 0 10px">รองรับภาพถ่าย เอกสาร PDF/Word/Excel ในโฟลเดอร์ Drive "opec-uploads" (แยกตามรหัสโรงเรียน) — ไม่เกิน 8MB/ไฟล์</div>
       <div id="fileList" class="file-list"></div>
     </div>
   </div>`;
-  refreshFiles();
+  await refreshFiles(schoolId);
 }
 
-async function refreshFiles() {
+function isUploadPanelCurrent(schoolId, box) {
+  const panel = $('#tab-files');
+  return Boolean(SELECTED && String(SELECTED.id) === schoolId && panel && panel.classList.contains('active') && box && box.isConnected && $('#fileList') === box);
+}
+
+async function showUploadPermissionError(schoolId, box) {
+  if (!isUploadPanelCurrent(schoolId, box)) return;
+  const message = 'ระบบยังไม่ได้รับสิทธิ์จัดเก็บไฟล์ใน Google Drive กรุณาแจ้งผู้ดูแลระบบให้อนุมัติสิทธิ์ Drive สำหรับระบบนิเทศ แล้วลองใหม่';
+  box.innerHTML = `<div class="empty">${esc(message)}</div>`;
+  if (window.Swal) await Swal.fire({ icon: 'warning', title: 'ยังไม่พร้อมใช้งานไฟล์หลักฐาน', text: message, confirmButtonText: 'รับทราบ' });
+  else toast(message, false);
+}
+
+async function refreshFiles(schoolId = SELECTED ? String(SELECTED.id) : '') {
   const box = $('#fileList');
-  if (!box) return;
+  if (!isUploadPanelCurrent(schoolId, box)) return;
   box.innerHTML = `<div class="loading">กำลังโหลดไฟล์...</div>`;
-  const r = await post('getUploads', { schoolId: SELECTED.id });
+  const r = await post('getUploads', { schoolId });
+  if (!isUploadPanelCurrent(schoolId, box)) return;
+  if (r && r.code === 'DRIVE_AUTH_REQUIRED') { await showUploadPermissionError(schoolId, box); return; }
   if (!r || !r.success) { box.innerHTML = `<div class="empty">${esc((r||{}).message || 'โหลดไม่สำเร็จ')}</div>`; return; }
   const list = r.data || [];
   if (!list.length) { box.innerHTML = `<div class="empty">ยังไม่มีไฟล์หลักฐานของโรงเรียนนี้</div>`; return; }
@@ -671,22 +691,64 @@ async function refreshFiles() {
 
 async function doUpload() {
   const input = $('#filePick');
-  const files = input && input.files;
-  if (!files || !files.length) { toast('เลือกไฟล์ก่อน', false); return; }
-  for (const f of files) {
-    if (f.size > 8 * 1024 * 1024) { toast('ไฟล์ "' + f.name + '" ใหญ่เกิน 8MB', false); continue; }
-    toast('กำลังอัปโหลด "' + f.name + '" ...', false);
-    const compressed = await compressImage(f);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const data64 = String(reader.result).split(',')[1];
-      const r = await post('uploadFile', { schoolId: SELECTED.id, filename: compressed.name, mime: compressed.type || 'application/octet-stream', data64 });
-      if (r && r.success) { toast(r.message, true); refreshFiles(); }
-      else toast((r || {}).message || 'อัปโหลดไม่สำเร็จ', false);
-    };
-    reader.readAsDataURL(compressed);
+  const button = $('#uploadButton');
+  const box = $('#fileList');
+  const schoolId = SELECTED ? String(SELECTED.id) : '';
+  if (!input || input.dataset.uploading === 'true' || !isUploadPanelCurrent(schoolId, box)) return;
+  const files = Array.from(input.files || []);
+  if (!files.length) { toast('เลือกไฟล์ก่อน', false); return; }
+  const maxBytes = 8 * 1024 * 1024;
+  const allowedExtension = /\.(jpe?g|png|pdf|docx?|xlsx?)$/i;
+  const failures = [];
+  let uploaded = 0;
+  let permissionRequired = false;
+  input.dataset.uploading = 'true';
+  input.disabled = true;
+  if (button) { button.disabled = true; button.textContent = 'กำลังอัปโหลด...'; }
+  try {
+    for (const f of files) {
+      if (!isUploadPanelCurrent(schoolId, box)) break;
+      if (!allowedExtension.test(f.name)) { failures.push('"' + f.name + '": รองรับ JPG/PNG/PDF/Word/Excel เท่านั้น'); continue; }
+      if (f.size > maxBytes) { failures.push('"' + f.name + '": ใหญ่เกิน 8MB'); continue; }
+      if (!f.size) { failures.push('"' + f.name + '": ไฟล์ว่าง'); continue; }
+      try {
+        const compressed = await compressImage(f);
+        const data64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+          reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+          reader.onabort = () => reject(new Error('การอ่านไฟล์ถูกยกเลิก'));
+          reader.readAsDataURL(compressed);
+        });
+        if (!isUploadPanelCurrent(schoolId, box)) break;
+        if (!data64) throw new Error('ไม่พบข้อมูลไฟล์');
+        const r = await post('uploadFile', { schoolId, filename: compressed.name, mime: compressed.type || 'application/octet-stream', data64 });
+        if (r && r.code === 'DRIVE_AUTH_REQUIRED') {
+          permissionRequired = true;
+          await showUploadPermissionError(schoolId, box);
+          break;
+        }
+        if (r && r.success) uploaded++;
+        else failures.push('"' + f.name + '": ' + ((r || {}).message || 'อัปโหลดไม่สำเร็จ'));
+      } catch (e) {
+        failures.push('"' + f.name + '": ' + (e.message || 'อัปโหลดไม่สำเร็จ'));
+      }
+    }
+    if (isUploadPanelCurrent(schoolId, box) && !permissionRequired) {
+      if (uploaded) await refreshFiles(schoolId);
+      if (!isUploadPanelCurrent(schoolId, box)) return;
+      if (failures.length && window.Swal) await Swal.fire({ icon: 'warning', title: uploaded ? 'อัปโหลดสำเร็จ ' + uploaded + ' ไฟล์' : 'อัปโหลดไม่สำเร็จ', text: failures.join('\n'), confirmButtonText: 'รับทราบ' });
+      else if (failures.length) toast(failures.join(' · '), false);
+      else if (uploaded) toast('อัปโหลดสำเร็จ ' + uploaded + ' ไฟล์', true);
+    }
+  } finally {
+    input.dataset.uploading = 'false';
+    if (isUploadPanelCurrent(schoolId, box) && $('#filePick') === input) {
+      input.disabled = false;
+      input.value = '';
+      if (button) { button.disabled = false; button.textContent = '⬆️ อัปโหลด'; }
+    }
   }
-  input.value = '';
 }
 
 async function deleteUpload(id) {
