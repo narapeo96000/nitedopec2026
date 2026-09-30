@@ -388,8 +388,8 @@ function showLogin() {
         <input type="text" id="dirSearch" class="form-control" placeholder="พิมพ์ รหัส / ชื่อโรงเรียน / ที่อยู่ / ตำบล / อำเภอ..." autocomplete="off" oninput="renderDir()">
         <div class="table-wrap mt-2">
           <table class="addr-table">
-            <thead><tr><th>รหัส/ชื่อสถานศึกษา</th><th>ที่อยู่</th><th>อำเภอ</th><th>ตำบล</th><th>โทรศัพท์</th><th>บุคลากร</th><th>ผู้เรียน</th></tr></thead>
-            <tbody id="dirBody"><tr><td colspan="7" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
+            <thead><tr><th scope="col"><span aria-hidden="true">🏫</span> รหัส / ชื่อสถานศึกษา</th><th scope="col">ที่อยู่</th><th scope="col">อำเภอ</th><th scope="col">ตำบล</th><th scope="col">โทรศัพท์</th><th scope="col"><span class="dir-count-heading"><span aria-hidden="true">👨‍🏫</span> บุคลากร</span> / <span class="dir-count-heading"><span aria-hidden="true">🎒</span> ผู้เรียน</span></th></tr></thead>
+            <tbody id="dirBody"><tr><td colspan="6" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -500,16 +500,15 @@ function renderDir() {
     (s.subdist || '').toLowerCase().includes(kw) ||
     (s.form || '').toLowerCase().includes(kw));
   const c = $('#dirCount'); if (c) c.textContent = list.length + ' รายการ';
-  if (!list.length) { body.innerHTML = `<tr><td colspan="7" class="text-center text-muted">ไม่พบสถานศึกษา</td></tr>`; return; }
+  if (!list.length) { body.innerHTML = `<tr><td colspan="6" class="text-center text-muted">ไม่พบสถานศึกษา</td></tr>`; return; }
   body.innerHTML = list.map(s => `
     <tr>
-      <td><b class="oppts">${esc(s.name)}</b><br><small class="text-muted">รหัส ${esc(s.id)} · ${esc(s.form || '')}</small></td>
+      <td><div class="dir-school"><span class="dir-school-icon" aria-hidden="true">🏫</span><div><b class="oppts">${esc(s.name)}</b><small class="dir-school-code">รหัส ${esc(s.id)}</small><small class="text-muted">${esc(s.form || '')}</small></div></div></td>
       <td data-label="ที่อยู่">${esc(s.address || '-')}</td>
       <td data-label="อำเภอ">${esc(s.dist || '-')}</td>
       <td data-label="ตำบล">${esc(s.subdist || '-')}</td>
       <td data-label="โทรศัพท์">${esc(s.phone || '-')}</td>
-      <td data-label="บุคลากร">${numbered(s.staff)}</td>
-      <td data-label="ผู้เรียน">${numbered(s.students)}</td>
+      <td><div class="dir-counts"><span class="dir-count dir-staff"><span aria-hidden="true">👨‍🏫</span><span class="dir-count-label">บุคลากร </span><b>${numbered(s.staff)}</b></span><span class="dir-count-divider" aria-hidden="true">/</span><span class="dir-count dir-students"><span aria-hidden="true">🎒</span><span class="dir-count-label">ผู้เรียน </span><b>${numbered(s.students)}</b></span></div></td>
     </tr>`).join('');
 }
 async function loadLoginData() {
@@ -543,7 +542,7 @@ async function loadLoginData() {
     renderDir();
   } else {
     const body = $('#dirBody');
-    if (body) body.innerHTML = `<tr><td colspan="7" class="text-center text-muted">${esc((r || {}).message || 'ไม่สามารถโหลดรายชื่อได้')}</td></tr>`;
+    if (body) body.innerHTML = `<tr><td colspan="6" class="text-center text-muted">${esc((r || {}).message || 'ไม่สามารถโหลดรายชื่อได้')}</td></tr>`;
   }
 }
 
