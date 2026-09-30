@@ -177,7 +177,7 @@ function buildTab1() {
       return `<label class="round edu-type"><input type="radio" name="educationForm" value="${esc(value)}" ${current === value ? 'checked' : ''}><span><b>${label}</b></span></label>`;
     }).join('')}</div>
     <div class="sec-h">ปักหมุด พิกัดแผนที่</div>
-    <div class="pin-coords basic-pin-row"><input id="basicCoords" placeholder="ละติจูด, ลองจิจูด" value="${esc(SELECTED_COORDS || (SELECTED && SELECTED.coords) || '')}"><button type="button" class="btn btn-mini" id="basicSetPin">บันทึกพิกัด</button></div>
+    <div id="basicPinCard"></div>
     <div class="sep"></div>
     <div class="sec-h">ข้อมูล ณ วันที่นิเทศ</div>
     <div class="kv-grid">${renderKeyvals([
@@ -189,9 +189,24 @@ function buildTab1() {
     ])}
     </div>
     <div class="sec-h">รอบการนิเทศ / ประเภทการนิเทศ</div>
-    <div class="kv-grid">${ROUNDS.map(r => `<label class="round"><input type="radio" name="formType" value="${esc(r.v)}" ${r === ROUNDS[0] ? 'checked' : ''}><span><b>${esc(r.v)}</b><small>${esc(r.note)}</small></span></label>`).join('')}</div>
+    <div class="kv-grid">${ROUNDS.map(r => {
+      const currentRound = STATE.evalMeta.formType || ROUNDS[0].v;
+      const checked = currentRound === r.v || (r.v === 'รอบที่ 3 (เพิ่มเติม)' && currentRound.indexOf(r.v) === 0);
+      return `<label class="round"><input type="radio" name="formType" value="${esc(r.v)}" ${checked ? 'checked' : ''}><span><b>${esc(r.v)}</b><small>${esc(r.note)}</small></span></label>`;
+    }).join('')}</div>
+    <label class="area-field" id="roundOtherWrap" style="display:${(STATE.evalMeta.formType || '').indexOf('รอบที่ 3 (เพิ่มเติม)') === 0 ? 'block' : 'none'};margin-top:10px"><span>รายละเอียดรอบที่ 3</span><input type="text" id="roundOther" class="form-control" placeholder="ระบุรายละเอียดรอบการนิเทศเพิ่มเติม" value="${esc(STATE.evalMeta.roundOther || '')}"></label>
   </div>`;
-  root.querySelectorAll('input[name=formType]').forEach(r => r.addEventListener('change', () => { STATE.evalMeta.formType = r.value; }));
+  root.querySelectorAll('input[name=formType]').forEach(r => r.addEventListener('change', () => {
+    STATE.evalMeta.formType = r.value;
+    const other = root.querySelector('#roundOtherWrap');
+    if (other) other.style.display = r.value === 'รอบที่ 3 (เพิ่มเติม)' ? 'block' : 'none';
+    if (typeof markFormDirty === 'function') markFormDirty();
+  }));
+  const roundOther = root.querySelector('#roundOther');
+  if (roundOther) roundOther.addEventListener('input', () => {
+    STATE.evalMeta.roundOther = roundOther.value;
+    if (typeof markFormDirty === 'function') markFormDirty();
+  });
   root.querySelectorAll('input[name=educationForm]').forEach(r => r.addEventListener('change', () => {
     STATE.basic.form = r.value;
     if (typeof markFormDirty === 'function') markFormDirty();
@@ -203,19 +218,6 @@ function buildTab1() {
       if (dk === 'name') { /* แสดงผลเมื่อบันทึกแล้ว */ }
     });
   });
-  const basicPin = root.querySelector('#basicSetPin');
-  if (basicPin) basicPin.onclick = async () => {
-    const input = root.querySelector('#basicCoords');
-    const coords = input ? input.value.trim() : '';
-    if (!coords) { toast('กรุณาระบุพิกัด', false); return; }
-    if (!SELECTED) { toast('กรุณาเลือกสถานศึกษาก่อน', false); return; }
-    const r = await post('saveSchoolPin', { id: SELECTED.id, coords });
-    if (r && r.success) {
-      SELECTED_COORDS = coords;
-      SELECTED.coords = coords;
-      toast(r.message || 'บันทึกพิกัดเรียบร้อย', true);
-    } else toast((r || {}).message || 'บันทึกพิกัดไม่สำเร็จ', false);
-  };
   // ย้าย: ใช้ updateScoreBar display ได้ (bar อยู่ด้านบนทุกแท็บ)
 }
 
@@ -396,6 +398,7 @@ function switchTab(id) {
     $(`#${t}`).classList.toggle('active', t === id));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.target === id));
   applyAnswersToDom($(`#${id}`));
+  requestAnimationFrame(refreshPinMaps);
   sidebarTouched = true;
 }
 
@@ -460,6 +463,7 @@ async function showAreaEvaluation() {
         ${areaTextField('schoolName','ชื่อโรงเรียน',form.name)}
         ${areaTextField('district','อำเภอ',form.dist)}
         <div class="area-field"><span>รูปแบบการจัดการศึกษา มี 3 รูปแบบ</span><div class="area-checks">${types.map((t,i)=>`<label><input type="checkbox" data-area-type="${i}" ${checks.includes(t.value) || (!checks.length && isDefaultType(t.value))?'checked':''}> ${esc(t.label)}</label>`).join('')}</div></div>
+        <div class="area-field"><span>ปักหมุด พิกัดแผนที่</span><div id="areaPinCard"></div></div>
         ${areaTextField('gradeLevels','ระดับชั้นที่เปิดสอน','')}
         ${areaTextField('studentCount','จำนวนนักเรียน','')}
         ${areaTextField('teacherCount','จำนวนครู','')}
@@ -471,9 +475,10 @@ async function showAreaEvaluation() {
       </div></div>
       <div class="grp"><div class="grp-h">2. จุดมุ่งหมายและวิธีดำเนินการ</div><p>ใช้สำหรับติดตามคุณภาพการบริหาร การนำหลักสูตรไปใช้ การจัดการเรียนรู้ และผลที่เกิดขึ้นกับผู้เรียน เพื่อค้นหาจุดแข็ง ประเด็นที่ควรพัฒนา และความต้องการสนับสนุนอย่างต่อเนื่อง</p><p>กระบวนการประกอบด้วยการสอบถามและสนทนา การพิจารณาข้อมูลและหลักฐานที่เกี่ยวข้อง การตรวจเยี่ยมชั้นเรียน และการสรุปสะท้อนผลร่วมกัน เครื่องมือนี้ใช้เพื่อพัฒนา ไม่ใช้จัดอันดับโรงเรียนหรือบุคลากร</p></div>
       <div class="grp"><div class="grp-h">เกณฑ์การพิจารณา</div><div class="table-wrap"><table class="tb"><thead><tr><th>ระดับ</th><th>ความหมาย</th></tr></thead><tbody><tr><td>2 ทำได้ชัดเจน</td><td>มีการดำเนินงานจริงและเห็นหลักฐานหรือผลจากการปฏิบัติ</td></tr><tr><td>1 กำลังพัฒนา</td><td>มีการดำเนินงานแล้วบางส่วน แต่ยังไม่ต่อเนื่องหรือไม่ชัดเจน</td></tr><tr><td>0 ต้องได้รับการช่วยเหลือ</td><td>ยังไม่พบการดำเนินงาน หรือเป็นประเด็นที่ควรได้รับการช่วยเหลือ</td></tr><tr><td>N/A</td><td>ไม่เกี่ยวข้องหรือมีข้อมูลไม่เพียงพอในการพิจารณาครั้งนี้</td></tr></tbody></table></div><p class="small text-muted">ไม่จำเป็นต้องตรวจเอกสารทุกฉบับ ให้เลือกเฉพาะหลักฐานที่สัมพันธ์กับประเด็นที่กำลังนิเทศ</p></div>
-      ${AREA_ITEMS.map((g,gi)=>`<div class="grp"><div class="grp-h">${esc(g.group)}</div><div class="area-question">คำถาม: ${gi===0?'โรงเรียนรู้หรือไม่ว่าต้องการพัฒนาผู้เรียนเรื่องใด และใช้ข้อมูลในการพัฒนาโรงเรียนจริงหรือไม่':gi===1?'หลักสูตรที่โรงเรียนกำหนดถูกนำไปใช้ในการจัดการเรียนรู้จริงหรือไม่':'ในชั้นเรียน ผู้เรียนได้คิด ลงมือทำ และเกิดการเรียนรู้หรือไม่'}</div><div class="area-items">${g.items.map((q,qi)=>{const n=g.items.slice(0,qi).length+AREA_ITEMS.slice(0,gi).reduce((s,x)=>s+x.items.length,0)+1;const v=(AREA_FORM_STATE.ratings||{})[n]||'';const note=(AREA_FORM_STATE.notes||{})[n]||'';return `<div class="area-item"><div class="area-q"><b>${n}.</b> ${esc(q)}</div><div class="area-score">${['2','1','0','N/A'].map(x=>`<label><input type="radio" name="area-score-${n}" value="${x}" data-area-score="${n}" ${v===x?'checked':''}> ${x}</label>`).join('')}</div><label class="area-field"><span>สิ่งที่พบ/หมายเหตุ</span><textarea data-area-note="${n}" rows="2" placeholder="บันทึกหลักฐานหรือข้อสังเกต">${esc(note)}</textarea></label>${n<=4?`<div class="area-evidence"><b>ตัวอย่างหลักฐาน:</b> แผนพัฒนาคุณภาพ แผนปฏิบัติการ ข้อมูลผู้เรียนและผลประเมิน SAR บันทึกนิเทศภายใน หรือการสนทนากับผู้บริหารและครู</div>`:''}</div>`}).join('')}</div></div>`).join('')}
+      ${AREA_ITEMS.map((g,gi)=>`<div class="grp"><div class="grp-h">${esc(g.group)}</div><div class="area-question">คำถาม: ${gi===0?'โรงเรียนรู้หรือไม่ว่าต้องการพัฒนาผู้เรียนเรื่องใด และใช้ข้อมูลในการพัฒนาโรงเรียนจริงหรือไม่':gi===1?'หลักสูตรที่โรงเรียนกำหนดถูกนำไปใช้ในการจัดการเรียนรู้จริงหรือไม่':'ในชั้นเรียน ผู้เรียนได้คิด ลงมือทำ และเกิดการเรียนรู้หรือไม่'}</div><div class="area-items">${g.items.map((q,qi)=>{const n=g.items.slice(0,qi).length+AREA_ITEMS.slice(0,gi).reduce((s,x)=>s+x.items.length,0)+1;const v=(AREA_FORM_STATE.ratings||{})[n]||'';const note=(AREA_FORM_STATE.notes||{})[n]||'';return `<div class="area-item"><div class="area-q"><b>${n}.</b> ${esc(q)}</div><div class="area-score">${['2','1','0','N/A'].map(x=>`<label class="score-choice score-${x==='N/A'?'na':x}"><input type="radio" name="area-score-${n}" value="${x}" data-area-score="${n}" ${v===x?'checked':''}> <span>${x}</span></label>`).join('')}</div><label class="area-field"><span>สิ่งที่พบ/หมายเหตุ</span><textarea data-area-note="${n}" rows="2" placeholder="บันทึกหลักฐานหรือข้อสังเกต">${esc(note)}</textarea></label>${n<=4?`<div class="area-evidence"><b>ตัวอย่างหลักฐาน:</b> แผนพัฒนาคุณภาพ แผนปฏิบัติการ ข้อมูลผู้เรียนและผลประเมิน SAR บันทึกนิเทศภายใน หรือการสนทนากับผู้บริหารและครู</div>`:''}</div>`}).join('')}</div></div>`).join('')}
       <div class="area-actions"><button class="btn btn-primary" onclick="saveAreaEvaluation()">💾 บันทึกแบบนิเทศทั่วไประดับพื้นที่</button></div>
     </div><div class="form-wrap"><div class="grp"><div class="grp-h">ประวัติแบบนิเทศทั่วไประดับพื้นที่</div><div id="areaHistory" class="loading">กำลังโหลดประวัติ...</div></div></div>`;
+  initPinBar('areaPinCard');
   wrap.querySelectorAll('[data-area-field]').forEach(x=>x.addEventListener('input',()=>{AREA_FORM_STATE[x.dataset.areaField]=x.value; markFormDirty();}));
   wrap.querySelectorAll('[data-area-type]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.formTypes=Array.from(wrap.querySelectorAll('[data-area-type]:checked')).map(c=>types[Number(c.dataset.areaType)].value); markFormDirty();}));
   wrap.querySelectorAll('[data-area-score]').forEach(x=>x.addEventListener('change',()=>{AREA_FORM_STATE.ratings=AREA_FORM_STATE.ratings||{};AREA_FORM_STATE.ratings[x.dataset.areaScore]=x.value; markFormDirty();}));
@@ -493,6 +498,7 @@ async function saveAreaEvaluation() {
 }
 
 function buildAll() {
+  destroyPinMaps();
   buildTab1(); buildTab2(); buildTab3(); buildTab4(); buildTab5(); buildTab6(); buildTab7();
   if (SELECTED) { initPinBar(); }
   updateScoreBar();
@@ -547,9 +553,12 @@ function collectResult() {
     evalDate: basic.evalDate || new Date().toISOString().slice(0,10),
     informant: basic.informant || ''
   };
+  const selectedRound = STATE.evalMeta.formType || ROUNDS[0].v;
+  const roundOther = String(STATE.evalMeta.roundOther || '').trim();
+  const fullRound = selectedRound === 'รอบที่ 3 (เพิ่มเติม)' && roundOther ? selectedRound + ': ' + roundOther : selectedRound;
   const evalData = {
-    formType: STATE.evalMeta.formType || ROUNDS[0].v,
-    round: STATE.evalMeta.formType || ROUNDS[0].v,
+    formType: fullRound,
+    round: fullRound,
     answers: STATE.answers,
     notes: { support_etc, develop: (document.querySelector('[data-key=develop]')||{}).value || '' , ...STATE.notes },
     basic: { ...basic, ...t },
@@ -571,6 +580,10 @@ function collectResult() {
 }
 
 async function saveResult(editRow) {
+  if (typeof INSPECTION_MODE !== 'undefined' && INSPECTION_MODE === 'general') {
+    toast('โหมดนิเทศทั่วไปให้บันทึกผ่านแบบนิเทศทั่วไประดับพื้นที่เท่านั้น', false);
+    return;
+  }
   const payload = collectResult();
   if (!payload) { toast("กรุณาเลือกสถานศึกษาก่อน", false); return; }
   if (payload.evalData.s1 === 0 && Object.keys(STATE.answers).length === 0) {
@@ -623,26 +636,46 @@ async function aiDraftAgreement() {
 async function showUploadsPanel() {
   switchTab('tab-files');
   const wrap = $('#filesWrap');
+  if (!wrap) return;
   if (!SELECTED) { wrap.innerHTML = `<div class="empty">กรุณาเลือกสถานศึกษา เพื่อจัดการไฟล์หลักฐาน</div>`; return; }
+  const schoolId = String(SELECTED.id);
+  const existingInput = $('#filePick');
+  if (wrap.dataset.schoolId === schoolId && existingInput && existingInput.dataset.uploading === 'true') return;
+  wrap.dataset.schoolId = schoolId;
   wrap.innerHTML = `<div class="form-wrap">
     <div class="grp">
       <div class="grp-h">📎 ไฟล์หลักฐานการนิเทศ — ${esc(SELECTED.name)}</div>
       <div class="upload-row">
         <input type="file" id="filePick" multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx">
-        <button class="btn btn-primary" onclick="doUpload()">⬆️ อัปโหลด</button>
+        <button id="uploadButton" class="btn btn-primary" onclick="doUpload()">⬆️ อัปโหลด</button>
       </div>
       <div class="hint" style="margin:6px 0 10px">รองรับภาพถ่าย เอกสาร PDF/Word/Excel ในโฟลเดอร์ Drive "opec-uploads" (แยกตามรหัสโรงเรียน) — ไม่เกิน 8MB/ไฟล์</div>
       <div id="fileList" class="file-list"></div>
     </div>
   </div>`;
-  refreshFiles();
+  await refreshFiles(schoolId);
 }
 
-async function refreshFiles() {
+function isUploadPanelCurrent(schoolId, box) {
+  const panel = $('#tab-files');
+  return Boolean(SELECTED && String(SELECTED.id) === schoolId && panel && panel.classList.contains('active') && box && box.isConnected && $('#fileList') === box);
+}
+
+async function showUploadPermissionError(schoolId, box) {
+  if (!isUploadPanelCurrent(schoolId, box)) return;
+  const message = 'ระบบยังไม่ได้รับสิทธิ์จัดเก็บไฟล์ใน Google Drive กรุณาแจ้งผู้ดูแลระบบให้อนุมัติสิทธิ์ Drive สำหรับระบบนิเทศ แล้วลองใหม่';
+  box.innerHTML = `<div class="empty">${esc(message)}</div>`;
+  if (window.Swal) await Swal.fire({ icon: 'warning', title: 'ยังไม่พร้อมใช้งานไฟล์หลักฐาน', text: message, confirmButtonText: 'รับทราบ' });
+  else toast(message, false);
+}
+
+async function refreshFiles(schoolId = SELECTED ? String(SELECTED.id) : '') {
   const box = $('#fileList');
-  if (!box) return;
+  if (!isUploadPanelCurrent(schoolId, box)) return;
   box.innerHTML = `<div class="loading">กำลังโหลดไฟล์...</div>`;
-  const r = await post('getUploads', { schoolId: SELECTED.id });
+  const r = await post('getUploads', { schoolId });
+  if (!isUploadPanelCurrent(schoolId, box)) return;
+  if (r && r.code === 'DRIVE_AUTH_REQUIRED') { await showUploadPermissionError(schoolId, box); return; }
   if (!r || !r.success) { box.innerHTML = `<div class="empty">${esc((r||{}).message || 'โหลดไม่สำเร็จ')}</div>`; return; }
   const list = r.data || [];
   if (!list.length) { box.innerHTML = `<div class="empty">ยังไม่มีไฟล์หลักฐานของโรงเรียนนี้</div>`; return; }
@@ -658,22 +691,64 @@ async function refreshFiles() {
 
 async function doUpload() {
   const input = $('#filePick');
-  const files = input && input.files;
-  if (!files || !files.length) { toast('เลือกไฟล์ก่อน', false); return; }
-  for (const f of files) {
-    if (f.size > 8 * 1024 * 1024) { toast('ไฟล์ "' + f.name + '" ใหญ่เกิน 8MB', false); continue; }
-    toast('กำลังอัปโหลด "' + f.name + '" ...', false);
-    const compressed = await compressImage(f);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const data64 = String(reader.result).split(',')[1];
-      const r = await post('uploadFile', { schoolId: SELECTED.id, filename: compressed.name, mime: compressed.type || 'application/octet-stream', data64 });
-      if (r && r.success) { toast(r.message, true); refreshFiles(); }
-      else toast((r || {}).message || 'อัปโหลดไม่สำเร็จ', false);
-    };
-    reader.readAsDataURL(compressed);
+  const button = $('#uploadButton');
+  const box = $('#fileList');
+  const schoolId = SELECTED ? String(SELECTED.id) : '';
+  if (!input || input.dataset.uploading === 'true' || !isUploadPanelCurrent(schoolId, box)) return;
+  const files = Array.from(input.files || []);
+  if (!files.length) { toast('เลือกไฟล์ก่อน', false); return; }
+  const maxBytes = 8 * 1024 * 1024;
+  const allowedExtension = /\.(jpe?g|png|pdf|docx?|xlsx?)$/i;
+  const failures = [];
+  let uploaded = 0;
+  let permissionRequired = false;
+  input.dataset.uploading = 'true';
+  input.disabled = true;
+  if (button) { button.disabled = true; button.textContent = 'กำลังอัปโหลด...'; }
+  try {
+    for (const f of files) {
+      if (!isUploadPanelCurrent(schoolId, box)) break;
+      if (!allowedExtension.test(f.name)) { failures.push('"' + f.name + '": รองรับ JPG/PNG/PDF/Word/Excel เท่านั้น'); continue; }
+      if (f.size > maxBytes) { failures.push('"' + f.name + '": ใหญ่เกิน 8MB'); continue; }
+      if (!f.size) { failures.push('"' + f.name + '": ไฟล์ว่าง'); continue; }
+      try {
+        const compressed = await compressImage(f);
+        const data64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+          reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+          reader.onabort = () => reject(new Error('การอ่านไฟล์ถูกยกเลิก'));
+          reader.readAsDataURL(compressed);
+        });
+        if (!isUploadPanelCurrent(schoolId, box)) break;
+        if (!data64) throw new Error('ไม่พบข้อมูลไฟล์');
+        const r = await post('uploadFile', { schoolId, filename: compressed.name, mime: compressed.type || 'application/octet-stream', data64 });
+        if (r && r.code === 'DRIVE_AUTH_REQUIRED') {
+          permissionRequired = true;
+          await showUploadPermissionError(schoolId, box);
+          break;
+        }
+        if (r && r.success) uploaded++;
+        else failures.push('"' + f.name + '": ' + ((r || {}).message || 'อัปโหลดไม่สำเร็จ'));
+      } catch (e) {
+        failures.push('"' + f.name + '": ' + (e.message || 'อัปโหลดไม่สำเร็จ'));
+      }
+    }
+    if (isUploadPanelCurrent(schoolId, box) && !permissionRequired) {
+      if (uploaded) await refreshFiles(schoolId);
+      if (!isUploadPanelCurrent(schoolId, box)) return;
+      if (failures.length && window.Swal) await Swal.fire({ icon: 'warning', title: uploaded ? 'อัปโหลดสำเร็จ ' + uploaded + ' ไฟล์' : 'อัปโหลดไม่สำเร็จ', text: failures.join('\n'), confirmButtonText: 'รับทราบ' });
+      else if (failures.length) toast(failures.join(' · '), false);
+      else if (uploaded) toast('อัปโหลดสำเร็จ ' + uploaded + ' ไฟล์', true);
+    }
+  } finally {
+    input.dataset.uploading = 'false';
+    if (isUploadPanelCurrent(schoolId, box) && $('#filePick') === input) {
+      input.disabled = false;
+      input.value = '';
+      if (button) { button.disabled = false; button.textContent = '⬆️ อัปโหลด'; }
+    }
   }
-  input.value = '';
 }
 
 async function deleteUpload(id) {
@@ -739,7 +814,7 @@ async function loadHistoryRow(row) {
     multibasic: d.multibasic || {},
     multiVals: d.multiVals || {},
     basic: d.basic || {},
-    evalMeta: { formType: d.formType || 'รอบที่ 1 (ภาคเรียนที่ 1)', round: d.round || '' }
+    evalMeta: { formType: (d.formType || '').indexOf('รอบที่ 3 (เพิ่มเติม)') === 0 ? 'รอบที่ 3 (เพิ่มเติม)' : (d.formType || 'รอบที่ 1 (ภาคเรียนที่ 1)'), round: d.round || '', roundOther: (d.formType || '').indexOf('รอบที่ 3 (เพิ่มเติม): ') === 0 ? d.formType.replace('รอบที่ 3 (เพิ่มเติม): ', '') : '' }
   };
   EDIT_ROW = Number(row);
   buildAll();
@@ -879,8 +954,51 @@ async function userStatus(u, s) {
 function showInfo() {
   switchTab('tab-info');
   $('#infoWrap').innerHTML = `
-    <div class="help-card"><h3>📘 วิธีใช้ระบบนิเทศออนไลน์ สถานศึกษาเอกชนในระบบ</h3>
-    <p><b>ขั้นตอนแนะนำ :</b></p>
+    <div class="help-card"><h3>📘 คู่มือการใช้งานระบบนิเทศออนไลน์ โรงเรียนเอกชน จ.นราธิวาส</h3>
+    <p class="note">คู่มือนี้ใช้สำหรับการทำงานภาคสนามบนคอมพิวเตอร์ แท็บเล็ต และโทรศัพท์มือถือ</p>
+    <h4>1. เข้าสู่ระบบ</h4>
+    <ol>
+      <li>เลือกรูปแบบการนิเทศก่อนเข้าสู่ระบบ: <b>นิเทศเต็มรูปแบบ</b> หรือ <b>นิเทศทั่วไป</b></li>
+      <li>พิมพ์ Username และ Password แล้วกด <b>เข้าสู่ระบบ</b></li>
+      <li>ถ้าต้องการเปิดโรงเรียนทันที ให้ค้นหาจากช่องเลือกสถานศึกษาบนหน้าเข้าสู่ระบบ แล้วเลือกรายการที่พบ</li>
+    </ol>
+    <h4>2. เลือกสถานศึกษา</h4>
+    <ol>
+      <li>ที่เมนูซ้าย ใช้ช่อง <b>ค้นหาสถานศึกษา</b> กรองด้วยรหัส ชื่อ อำเภอ หรือตำบล</li>
+      <li>กดรายการโรงเรียนที่ต้องการ ระบบจะโหลดข้อมูลและเปิดแบบบันทึกให้อัตโนมัติ</li>
+      <li>หากมีข้อมูลที่แก้ไขแล้วยังไม่บันทึก ระบบจะแจ้งเตือนก่อนเปลี่ยนโรงเรียน</li>
+    </ol>
+    <h4>3. นิเทศเต็มรูปแบบ</h4>
+    <p>ใช้เมนูข้อมูลพื้นฐานและแท็บการนิเทศตามลำดับ ระบบจะแสดงเฉพาะแท็บที่เกี่ยวข้องกับการบันทึกแบบเต็มรูปแบบ</p>
+    <ol>
+      <li><b>📁 ข้อมูลพื้นฐาน:</b> ตรวจทานรูปแบบการจัดการศึกษา ข้อมูล ณ วันที่นิเทศ รอบการนิเทศ และข้อมูลโรงเรียน</li>
+      <li><b>🏛️ บริหาร/ระบบคุณภาพ:</b> ประเมินส่วนที่ 1</li>
+      <li><b>📚 หลักสูตร/จัดการเรียนรู้:</b> ประเมินส่วนที่ 2 และ 3</li>
+      <li><b>📊 วัดผล/ผลผู้เรียน:</b> ประเมินผลการเรียนรู้</li>
+      <li><b>🧐 ตรวจเยี่ยมชั้นเรียน:</b> บันทึกผลการตรวจเยี่ยม</li>
+      <li><b>🔧 สะท้อนผล/แผนพัฒนา:</b> บันทึกจุดแข็ง ประเด็นพัฒนา และข้อตกลง</li>
+      <li><b>✅ ติดตาม/สรุป:</b> บันทึกการติดตามและสรุปผล</li>
+    </ol>
+    <h4>4. นิเทศทั่วไป</h4>
+    <p>ระบบจะแสดงแบบ <b>🧭 นิเทศทั่วไประดับพื้นที่</b> เท่านั้น ให้กรอกข้อมูลทั่วไป เลือกรูปแบบการจัดการศึกษา ให้คะแนน 2/1/0/N/A และกด <b>บันทึกแบบนิเทศทั่วไประดับพื้นที่</b></p>
+    <h4>5. คะแนนและการบันทึก</h4>
+    <p>เกณฑ์คะแนน: <b>2</b>=ทำได้ชัดเจน, <b>1</b>=กำลังพัฒนา, <b>0</b>=ต้องได้รับการช่วยเหลือ, <b>N/A</b>=ไม่เกี่ยวข้องหรือข้อมูลไม่เพียงพอ</p>
+    <p>เมื่อแก้ไขข้อมูลแล้วให้กดปุ่ม <b>💾 บันทึก</b> ทุกครั้ง หากกดเปลี่ยนเมนูหรือกลับหน้าแรกก่อนบันทึก ระบบจะแจ้งเตือน</p>
+    <h4>6. ปักหมุดพิกัด</h4>
+    <ol>
+      <li>กดแผนที่หรือปุ่ม <b>📌 หาพิกัดปัจจุบัน</b></li>
+      <li>เลือกดูได้ทั้ง <b>แผนที่ดาวเทียม</b> และ <b>แผนที่เส้นทาง</b></li>
+      <li>ตรวจค่าละติจูด/ลองจิจูด แล้วกด <b>บันทึกพิกัด</b></li>
+    </ol>
+    <h4>7. ไฟล์หลักฐาน</h4>
+    <p>ที่เมนู <b>📎 ไฟล์/หลักฐาน</b> รองรับ JPG, JPEG, PNG, PDF, Word และ Excel ขนาดไม่เกิน <b>8MB ต่อไฟล์</b> ไฟล์จะเก็บใน Drive โฟลเดอร์ <b>opec-uploads</b> แยกตามรหัสโรงเรียน</p>
+    <h4>8. เมนูประวัติและสถิติ</h4>
+    <p><b>📜 ประวัติการนิเทศ</b> ใช้ตรวจรายการที่เคยบันทึก และ <b>📊 สถิติระบบ</b> ใช้ดูจำนวนสถานศึกษา บุคลากร ผู้เรียน และจำนวนครั้งที่นิเทศ</p>
+    <p><b>กรณีอัปโหลดไม่ได้:</b> ให้แจ้งผู้ดูแลระบบตรวจสิทธิ์ Google Drive ของบัญชีผู้เผยแพร่ระบบก่อนทดลองใหม่</p>
+    <h4>📘 คู่มือฉบับสมบูรณ์</h4>
+    <p>ดาวน์โหลดคู่มือพร้อมคำอธิบายและภาพประกอบ: <a href="คู่มือการใช้งานระบบนิเทศออนไลน์_ฉบับสมบูรณ์.pdf" target="_blank" rel="noopener">PDF</a> · <a href="คู่มือการใช้งานระบบนิเทศออนไลน์_ฉบับสมบูรณ์.docx" target="_blank" rel="noopener">Word</a></p>
+    <hr>
+    <p><b>ขั้นตอนแนะนำแบบย่อ :</b></p>
     <ol>
       <li><b>แท็บที่ 1 📁</b> กรอก/ตรวจทานข้อมูลพื้นฐาน และเลือกรอบการนิเทศ (ครั้งที่ 1 หรือ 2)</li>
       <li><b>แท็บที่ 2-5</b> ประเมินตามส่วนที่ 1-4 ของคู่มือ โดยให้คะแนน 2/1/0/N/A พร้อมบันทึกหลักฐาน</li>

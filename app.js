@@ -91,7 +91,8 @@ const SUPPORT_OPTIONS = [
 ];
 const ROUNDS = [
   { v: "รอบที่ 1 (ภาคเรียนที่ 1)", note: "สำรวจสภาพปัจจุบัน กำหนดประเด็นพัฒนา / ตรวจเยี่ยมชั้นเรียน" },
-  { v: "รอบที่ 2 (ภาคเรียนที่ 2)", note: "ติดตามผลการเปลี่ยนแปลงจากข้อตกลงครั้งก่อน" }
+  { v: "รอบที่ 2 (ภาคเรียนที่ 2)", note: "ติดตามผลการเปลี่ยนแปลงจากข้อตกลงครั้งก่อน" },
+  { v: "รอบที่ 3 (เพิ่มเติม)", note: "ระบุรายละเอียดรอบการนิเทศเพิ่มเติม" }
 ];
 const SUMMARY_Q = [
   "ประเด็นที่เห็นจุดแข็ง/สิ่งที่ทำได้ดีที่สุด คืออะไร",
@@ -202,7 +203,7 @@ function compressImage(file, maxW = 1600, quality = 0.7) {
       c.width = w; c.height = h;
       c.getContext('2d').drawImage(img, 0, 0, w, h);
       c.toBlob(b => {
-        if (b && b.size < file.size) resolve(new File([b], file.name, { type: 'image/jpeg' }));
+        if (b && b.size < file.size) resolve(new File([b], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
         else resolve(file);
       }, 'image/jpeg', quality);
     };
@@ -217,9 +218,10 @@ function compressImage(file, maxW = 1600, quality = 0.7) {
 let CURRENT_USER = null;
 let SCHOOLS = [];
 let SELECTED = null;        // ข้อมูลโรงเรียนที่เลือก (จาก getSchoolData)
+let INSPECTION_MODE = '';
+let INSPECTION_SCHOOL_PENDING = '';
 let SELECTED_COORDS = '';
-let MAP = null;
-let MAP_MARKER = null;
+const PIN_MAPS = new Map();
 let TABS = [];              // พาเนลแท็บที่ build ไว้
 let scrollItems = [];
 let sidebarTouched = false;
@@ -268,7 +270,7 @@ function restoreDraftIfAny() {
   STATE.multibasic = s.multibasic || {};
   STATE.multiVals = s.multiVals || {};
   STATE.basic = s.basic || {};
-  STATE.evalMeta = { formType: (s.evalMeta && s.evalMeta.formType) || ROUNDS[0].v, round: (s.evalMeta && s.evalMeta.round) || '' };
+  STATE.evalMeta = { formType: (s.evalMeta && s.evalMeta.formType) || ROUNDS[0].v, round: (s.evalMeta && s.evalMeta.round) || '', roundOther: (s.evalMeta && s.evalMeta.roundOther) || '' };
   const ft = STATE.evalMeta.formType;
   document.querySelectorAll(`input[name=formType][value="${esc(ft)}"]`).forEach(x => x.checked = true);
   applyAnswersToDom();
@@ -290,6 +292,7 @@ const REMEMBER_KEY = "opec_login";
 
 let CAPTCHA_A = 0, CAPTCHA_B = 0, CAPTCHA_OP = '+';
 let LOGIN_SCHOOL_ID = '';
+let LOGIN_INSPECTION_MODE = '';
 let LOGIN_BUSY = false;
 
 function genCaptcha() {
@@ -305,7 +308,9 @@ function checkCaptcha() {
 }
 
 function showLogin() {
+  destroyPinMaps();
   LOGIN_SCHOOL_ID = '';
+  LOGIN_INSPECTION_MODE = '';
   LOGIN_BUSY = false;
   const app = $('#app');
   app.innerHTML = `
@@ -327,9 +332,15 @@ function showLogin() {
         <div class="version-badge">📱 รุ่นพร้อมใช้งานภาคสนาม (Mobile Optimized)</div>
       </div>
 
-      <div class="card auth-card">
+      <div class="card home-login-card auth-card">
         <h4 class="text-center mb-3" style="color:#065f46;margin-top:0;">เข้าสู่ระบบ</h4>
         <div id="loginMsg" class="auth-msg"></div>
+        <div class="sec-h" style="margin-top:8px">เลือกรูปแบบการนิเทศ</div>
+        <div class="dash-stats" style="grid-template-columns:1fr 1fr;gap:8px;margin:8px 0">
+          <button type="button" class="dash-stat-card" id="loginModeFull" onclick="loginPickInspectionMode('full')"><div class="dash-stat-icon">📋</div><div class="dash-stat-label">นิเทศเต็มรูปแบบ</div></button>
+          <button type="button" class="dash-stat-card" id="loginModeGeneral" onclick="loginPickInspectionMode('general')"><div class="dash-stat-icon">🧭</div><div class="dash-stat-label">นิเทศทั่วไป</div></button>
+        </div>
+        <div id="loginModeHint" class="hint">กรุณาเลือกรูปแบบการนิเทศ</div>
         <label>Username</label>
         <input type="text" id="username" class="form-control mb-3" autocomplete="username">
         <label>Password</label>
@@ -351,7 +362,25 @@ function showLogin() {
         <p class="text-center mt-3 mb-0 small">ยังไม่มีบัญชี? <a href="javascript:void(0)" class="login-link" onclick="showRegister()">สมัครสมาชิก</a></p>
       </div>
 
-      <div class="card">
+      <div class="card home-docs-card">
+        <div class="card-title"><h4>📚 ดาวน์โหลดแผนและเครื่องมือนิเทศ</h4><span class="badge">PDF</span></div>
+        <div class="doc-list">
+          <a class="doc-item" href="https://drive.google.com/file/d/1gVkRj1wq8TjmxEZfq7cLJ035yUggpMaQ/view?usp=sharing" target="_blank" rel="noopener noreferrer">
+            <span class="doc-icon" aria-hidden="true">🏫</span>
+            <span class="doc-text"><b>โรงเรียนเอกชน</b></span>
+          </a>
+          <a class="doc-item" href="https://drive.google.com/file/d/1nuGVzZshKssSgGjSSEkkWkDU8FVSkwTP/view?usp=sharing" target="_blank" rel="noopener noreferrer">
+            <span class="doc-icon" aria-hidden="true">🕌</span>
+            <span class="doc-text"><b>ปอเนาะ</b></span>
+          </a>
+          <a class="doc-item" href="https://drive.google.com/file/d/1qm2s3AO5r7A2h7HKuUnB_QmI5tKuTJVC/view?usp=sharing" target="_blank" rel="noopener noreferrer">
+            <span class="doc-icon" aria-hidden="true">📖</span>
+            <span class="doc-text"><b>ตาดีกา</b></span>
+          </a>
+        </div>
+      </div>
+
+      <div class="card home-stats-card">
         <div class="card-title"><h4>📊 สถิติระบบนิเทศออนไลน์</h4><span class="badge">อัปเดตอัตโนมัติ</span></div>
         <div class="stat-grid">
           <div class="stat-card"><div class="lbl">🏫 สถานศึกษา</div><div class="val" id="st_schools">—</div></div>
@@ -371,36 +400,15 @@ function showLogin() {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card home-directory-card">
         <div class="card-title"><h4>🏫 ทำเนียบสถานศึกษาเอกชน</h4><span class="badge" id="dirCount">0 รายการ</span></div>
         <label>🔍 ค้นหาโรงเรียน <span class="small text-muted">(กรองข้อมูลแบบทันที)</span></label>
         <input type="text" id="dirSearch" class="form-control" placeholder="พิมพ์ รหัส / ชื่อโรงเรียน / ที่อยู่ / ตำบล / อำเภอ..." autocomplete="off" oninput="renderDir()">
         <div class="table-wrap mt-2">
           <table class="addr-table">
-            <thead><tr><th>รหัส/ชื่อสถานศึกษา</th><th>ที่อยู่</th><th>อำเภอ</th><th>ตำบล</th><th>โทรศัพท์</th><th>บุคลากร</th><th>ผู้เรียน</th></tr></thead>
-            <tbody id="dirBody"><tr><td colspan="7" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
+            <thead><tr><th scope="col"><span aria-hidden="true">🏫</span> รหัส / ชื่อสถานศึกษา</th><th scope="col">ที่อยู่</th><th scope="col">อำเภอ</th><th scope="col">ตำบล</th><th scope="col">โทรศัพท์</th><th scope="col"><span class="dir-count-heading"><span aria-hidden="true">👨‍🏫</span> บุคลากร</span><span class="dir-count-heading"><span aria-hidden="true">🎒</span> ผู้เรียน</span></th></tr></thead>
+            <tbody id="dirBody"><tr><td colspan="6" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
           </table>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title"><h4>📄 เอกสารดาวน์โหลด</h4><span class="badge">แผนนิเทศ</span></div>
-        <div class="doc-list">
-          <a class="doc-item" href="https://docs.google.com/document/d/140PRrImcq3b0-jAIsFTAUGJMGB5IMHBd/export?format=pdf" target="_blank">
-            <span class="doc-icon">📋</span>
-            <span class="doc-text"><b>แผนนิเทศ ติดตาม และประเมินผลการใช้หลักสูตรตาดีกา</b><br><small>ศูนย์การศึกษาอิสลามประจำมัสยิด จังหวัดนราธิวาส</small></span>
-            <span class="doc-dl">⬇ PDF</span>
-          </a>
-          <a class="doc-item" href="https://docs.google.com/document/d/1gb7mw8ZT6-PCLeSSzsTfcmTqfhoyv5wj/export?format=pdf" target="_blank">
-            <span class="doc-icon">📋</span>
-            <span class="doc-text"><b>แผนนิเทศ ติดตาม และพัฒนาการนำหลักสูตรไปใช้</b><br><small>สถาบันศึกษาปอเนาะ จังหวัดนราธิวาส</small></span>
-            <span class="doc-dl">⬇ PDF</span>
-          </a>
-          <a class="doc-item" href="https://docs.google.com/document/d/1hGeK46od6-DQ5SK8JsUvB6j5nklKU5xS/export?format=pdf" target="_blank">
-            <span class="doc-icon">📋</span>
-            <span class="doc-text"><b>แผนนิเทศ ติดตาม และตรวจเยี่ยมชั้นเรียน</b><br><small>โรงเรียนเอกชนในระบบ จังหวัดนราธิวาส</small></span>
-            <span class="doc-dl">⬇ PDF</span>
-          </a>
         </div>
       </div>
 
@@ -463,6 +471,20 @@ function loginPickSchool(id) {
   const inp = $('#lgSchoolSearch'); if (inp) inp.value = s ? s.name : id;
   toast(s ? ('เลือก: ' + s.name) : 'เลือก: ' + id, true);
 }
+function loginPickInspectionMode(mode) {
+  LOGIN_INSPECTION_MODE = mode === 'general' ? 'general' : 'full';
+  const full = $('#loginModeFull');
+  const general = $('#loginModeGeneral');
+  if (full) full.classList.toggle('selected', LOGIN_INSPECTION_MODE === 'full');
+  if (general) general.classList.toggle('selected', LOGIN_INSPECTION_MODE === 'general');
+  const hint = $('#loginModeHint');
+  if (hint) hint.textContent = LOGIN_INSPECTION_MODE === 'general'
+    ? 'เลือกนิเทศทั่วไป: บันทึกเฉพาะแบบนิเทศทั่วไประดับพื้นที่'
+    : 'เลือกนิเทศเต็มรูปแบบ: บันทึกข้อมูลครบทุกด้าน';
+}
+function inspectionModeText(mode) {
+  return mode === 'general' ? 'นิเทศทั่วไป' : 'นิเทศเต็มรูปแบบ';
+}
 function renderDir() {
   const body = $('#dirBody');
   if (!body) return;
@@ -475,16 +497,15 @@ function renderDir() {
     (s.subdist || '').toLowerCase().includes(kw) ||
     (s.form || '').toLowerCase().includes(kw));
   const c = $('#dirCount'); if (c) c.textContent = list.length + ' รายการ';
-  if (!list.length) { body.innerHTML = `<tr><td colspan="7" class="text-center text-muted">ไม่พบสถานศึกษา</td></tr>`; return; }
+  if (!list.length) { body.innerHTML = `<tr><td colspan="6" class="text-center text-muted">ไม่พบสถานศึกษา</td></tr>`; return; }
   body.innerHTML = list.map(s => `
     <tr>
-      <td><b class="oppts">${esc(s.name)}</b><br><small class="text-muted">รหัส ${esc(s.id)} · ${esc(s.form || '')}</small></td>
+      <td><div class="dir-school"><span class="dir-school-icon" aria-hidden="true">🏫</span><div><b class="oppts">${esc(s.name)}</b><small class="dir-school-code">รหัส ${esc(s.id)}</small><small class="text-muted">${esc(s.form || '')}</small></div></div></td>
       <td data-label="ที่อยู่">${esc(s.address || '-')}</td>
       <td data-label="อำเภอ">${esc(s.dist || '-')}</td>
       <td data-label="ตำบล">${esc(s.subdist || '-')}</td>
       <td data-label="โทรศัพท์">${esc(s.phone || '-')}</td>
-      <td data-label="บุคลากร">${numbered(s.staff)}</td>
-      <td data-label="ผู้เรียน">${numbered(s.students)}</td>
+      <td><div class="dir-counts"><span class="dir-count dir-staff"><span aria-hidden="true">👨‍🏫</span><span class="dir-count-label">บุคลากร </span><b>${numbered(s.staff)}</b></span><span class="dir-count dir-students"><span aria-hidden="true">🎒</span><span class="dir-count-label">ผู้เรียน </span><b>${numbered(s.students)}</b></span></div></td>
     </tr>`).join('');
 }
 async function loadLoginData() {
@@ -518,7 +539,7 @@ async function loadLoginData() {
     renderDir();
   } else {
     const body = $('#dirBody');
-    if (body) body.innerHTML = `<tr><td colspan="7" class="text-center text-muted">${esc((r || {}).message || 'ไม่สามารถโหลดรายชื่อได้')}</td></tr>`;
+    if (body) body.innerHTML = `<tr><td colspan="6" class="text-center text-muted">${esc((r || {}).message || 'ไม่สามารถโหลดรายชื่อได้')}</td></tr>`;
   }
 }
 
@@ -593,6 +614,10 @@ async function doLogin(e) {
     await alertLogin({ icon: 'warning', title: 'ข้อมูลไม่ครบถ้วน', text: 'กรุณากรอก Username และ Password', confirmButtonText: 'ตกลง' });
     return false;
   }
+  if (!LOGIN_INSPECTION_MODE) {
+    await alertLogin({ icon: 'warning', title: 'กรุณาเลือกรูปแบบการนิเทศ', text: 'เลือกระหว่างนิเทศเต็มรูปแบบหรือนิเทศทั่วไปก่อนเข้าสู่ระบบ', confirmButtonText: 'ตกลง' });
+    return false;
+  }
   LOGIN_BUSY = true;
   if (btn) { btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...'; }
   msg.className = 'auth-msg err';
@@ -601,6 +626,7 @@ async function doLogin(e) {
   const r = await post('login', { username: u, password: p });
   if (r && r.success) {
     CURRENT_USER = r.userData;
+    INSPECTION_MODE = LOGIN_INSPECTION_MODE;
     if ($('#rememberPass') && $('#rememberPass').checked) {
       localStorage.setItem(REMEMBER_KEY, JSON.stringify({ u, p: btoa(unescape(encodeURIComponent(p))) }));
     } else {
@@ -652,6 +678,8 @@ async function doRegister(e) {
 function logout() {
   if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
   CURRENT_USER = null;
+  INSPECTION_MODE = '';
+  INSPECTION_SCHOOL_PENDING = '';
   SCHOOLS = []; SELECTED = null; STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
   if (typeof setFormClean === 'function') setFormClean();
   if (AUTO_SAVE_INTERVAL) clearInterval(AUTO_SAVE_INTERVAL);
@@ -663,15 +691,118 @@ function logout() {
 // ============================================================
 // หน้าหลัก / Dashboard
 // ============================================================
+function sidebarSchoolPickerHtml() {
+  return `<div id="sidebarSchoolPicker" class="side-school-picker">
+    <label class="side-school-label" for="sidebarSchoolSearch">ค้นหาสถานศึกษา</label>
+    <div class="side-school-search-row">
+      <input type="search" id="sidebarSchoolSearch" placeholder="รหัส / ชื่อ / อำเภอ / ตำบล" autocomplete="off" aria-controls="sidebarSchoolResults" aria-describedby="sidebarSchoolCurrent" disabled>
+      <button type="button" class="side-school-clear" aria-label="ล้างคำค้นสถานศึกษา" title="ล้างคำค้น" disabled>✕</button>
+    </div>
+    <div id="sidebarSchoolResults" class="side-school-results" hidden></div>
+    <div id="sidebarSchoolCurrent" class="side-school-current" aria-live="polite">ยังไม่ได้เลือกสถานศึกษา</div>
+    <input type="hidden" id="schoolSelect">
+  </div>`;
+}
+
+function filterSidebarSchools(query) {
+  const words = String(query || '').toLocaleLowerCase('th').trim().split(/\s+/).filter(Boolean);
+  return SCHOOLS.filter(s => {
+    const text = [s.id, s.name, s.dist, s.subdist, s.form].join(' ').toLocaleLowerCase('th');
+    return words.every(word => text.includes(word));
+  });
+}
+
+function syncSidebarSchoolPicker(id) {
+  const school = SCHOOLS.find(s => String(s.id) === String(id || ''));
+  const input = $('#sidebarSchoolSearch');
+  const selected = $('#schoolSelect');
+  const current = $('#sidebarSchoolCurrent');
+  const results = $('#sidebarSchoolResults');
+  if (input) input.value = school ? school.name : '';
+  if (selected) selected.value = school ? school.id : '';
+  if (current) current.textContent = school ? 'เลือกอยู่: ' + school.name + '\nรหัส ' + school.id : 'ยังไม่ได้เลือกสถานศึกษา';
+  if (results) results.hidden = true;
+}
+
+function initSidebarSchoolPicker() {
+  const host = $('#sidebarSchoolPicker');
+  if (!host) return;
+  const input = host.querySelector('#sidebarSchoolSearch');
+  const results = host.querySelector('#sidebarSchoolResults');
+  const clear = host.querySelector('.side-school-clear');
+  const render = () => {
+    const list = filterSidebarSchools(input.value);
+    results.innerHTML = `<div class="side-school-count" role="status">${list.length ? 'พบ ' + list.length + ' สถานศึกษา' : 'ไม่พบสถานศึกษา ลองค้นหาด้วยคำอื่น'}</div>` + list.map(s => `
+      <button type="button" class="side-school-option ${SELECTED && String(SELECTED.id) === String(s.id) ? 'selected' : ''}" data-school-id="${esc(s.id)}">
+        <b>${esc(s.name)}</b><small>รหัส ${esc(s.id)}</small><small>${esc([s.dist, s.subdist].filter(Boolean).join(' · '))}</small>
+      </button>`).join('');
+    results.hidden = false;
+  };
+  input.oninput = render;
+  input.onfocus = () => { input.select(); render(); };
+  clear.onclick = () => { input.value = ''; input.focus(); render(); };
+  host.onfocusout = e => {
+    if (host.contains(e.relatedTarget)) return;
+    // Allow touch browsers to deliver the result button's click before hiding it.
+    setTimeout(() => { if (host.isConnected && !host.contains(document.activeElement)) results.hidden = true; }, 200);
+  };
+  host.onkeydown = e => {
+    if (e.key === 'Escape') { e.preventDefault(); input.focus(); results.hidden = true; return; }
+    if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return;
+    if (e.target === input) {
+      e.preventDefault();
+      if (results.hidden) render();
+      const buttons = results.querySelectorAll('button');
+      if (e.key === 'Enter' && buttons.length === 1) buttons[0].click();
+      else if (buttons.length) buttons[e.key === 'ArrowUp' ? buttons.length - 1 : 0].focus();
+    } else if (e.key !== 'Enter' && e.target.matches('[data-school-id]')) {
+      e.preventDefault();
+      const buttons = Array.from(results.querySelectorAll('button'));
+      const next = buttons.indexOf(e.target) + (e.key === 'ArrowDown' ? 1 : -1);
+      if (next >= 0 && next < buttons.length) buttons[next].focus(); else input.focus();
+    }
+  };
+  results.onclick = async e => {
+    const button = e.target.closest('[data-school-id]');
+    if (!button || host.dataset.loading === 'true') return;
+    const id = button.dataset.schoolId;
+    if (!INSPECTION_MODE) { startInspection(); toast('กรุณาเลือกรูปแบบการนิเทศก่อน', false); return; }
+    if (SELECTED && String(SELECTED.id) === id && $('#basicPinCard')) {
+      syncSidebarSchoolPicker(id);
+      if ($('#sidebar')) $('#sidebar').classList.remove('open');
+      return;
+    }
+    host.dataset.loading = 'true';
+    input.disabled = true;
+    clear.disabled = true;
+    results.hidden = true;
+    try {
+      const loaded = await loadSchool(id);
+      if (loaded && $('#sidebar')) $('#sidebar').classList.remove('open');
+    } finally {
+      host.dataset.loading = 'false';
+      if (host.isConnected) {
+        input.disabled = !SCHOOLS.length;
+        clear.disabled = !SCHOOLS.length;
+        syncSidebarSchoolPicker(SELECTED ? SELECTED.id : '');
+      }
+    }
+  };
+  input.disabled = !SCHOOLS.length;
+  clear.disabled = !SCHOOLS.length;
+  syncSidebarSchoolPicker(SELECTED ? SELECTED.id : '');
+}
+
 async function startDash() {
+  destroyPinMaps();
   const app = $('#app');
   app.innerHTML = `
-  <div class="topbar">
+    <div class="topbar">
     <div style="display:flex;align-items:center;gap:8px">
       <button class="hamburger" onclick="toggleSidebar()" id="hamburgerBtn">☰</button>
       <div class="tb-brand">🏫 <b>${APP_NAME}</b></div>
     </div>
-    <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small>
+    <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small><small class="role mode-role">${esc(inspectionModeText(INSPECTION_MODE))}</small>
       <button class="btn btn-mini" onclick="logout()">ออกจากระบบ</button>
     </div>
   </div>
@@ -680,11 +811,13 @@ async function startDash() {
       <div class="side-close"><button onclick="toggleSidebar()">✕ ปิด</button></div>
       <div class="side-card">
         <h4>เลือกสถานศึกษา</h4>
-        <select id="schoolSelect" onchange="loadSchool(this.value)"><option value="">— เลือกสถานศึกษา —</option></select>
+        ${sidebarSchoolPickerHtml()}
         <div id="pinCard"></div>
         <div class="side-actions">
-          <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn" id="saveFullBtn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
           <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
+          <button class="btn btn-mini" id="inspectionNextBtn" onclick="nextInspectionSection()" style="margin-top:6px">ถัดไป</button>
+          <button class="btn btn-mini" onclick="backToInspectionMode()" style="margin-top:6px">กลับหน้าแรก</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
       </div>
@@ -729,8 +862,7 @@ async function startDash() {
   const r = await post('getSchoolList');
   if (r && r.success) {
     SCHOOLS = (r.data || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const sel = $('#schoolSelect');
-    sel.innerHTML = '<option value="">— เลือกสถานศึกษา —</option>' + SCHOOLS.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+    initSidebarSchoolPicker();
     if (!SCHOOLS.length) $('#pinCard').innerHTML = `<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ <br>ผู้ดูแลสามารถพิมพ์ข้อมูลลงชีต ADDR_SCHOOL (เริ่มแถวที่ 2)</div>`;
   } else {
     $('#pinCard').innerHTML = `<div class="empty">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อโรงเรียนได้')}</div>`;
@@ -745,14 +877,15 @@ async function startDash() {
 // เข้าสู่ระบบแล้วเปิดโรงเรียนที่เลือกจากหน้า Login ทันที
 // ============================================================
 async function startDashWithSchool(schoolId) {
+  destroyPinMaps();
   const app = $('#app');
   app.innerHTML = `
-  <div class="topbar">
+    <div class="topbar">
     <div style="display:flex;align-items:center;gap:8px">
       <button class="hamburger" onclick="toggleSidebar()" id="hamburgerBtn">☰</button>
       <div class="tb-brand">🏫 <b>${APP_NAME}</b></div>
     </div>
-    <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small>
+    <div class="tb-user">${esc(CURRENT_USER ? CURRENT_USER.fname : '')} <small class="role">${esc(CURRENT_USER ? CURRENT_USER.role : '')}</small><small class="role mode-role">${esc(inspectionModeText(INSPECTION_MODE))}</small>
       <button class="btn btn-mini" onclick="logout()">ออกจากระบบ</button>
     </div>
   </div>
@@ -761,11 +894,13 @@ async function startDashWithSchool(schoolId) {
       <div class="side-close"><button onclick="toggleSidebar()">✕ ปิด</button></div>
       <div class="side-card">
         <h4>เลือกสถานศึกษา</h4>
-        <select id="schoolSelect" onchange="loadSchool(this.value)"><option value="">— เลือกสถานศึกษา —</option></select>
+        ${sidebarSchoolPickerHtml()}
         <div id="pinCard"></div>
         <div class="side-actions">
-          <button class="btn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
+          <button class="btn" id="saveFullBtn" onclick="saveResult()">💾 บันทึกผลการนิเทศ</button>
           <button class="btn btn-mini" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;margin-top:6px">↩️ ยกเลิกการแก้ไข</button>
+          <button class="btn btn-mini" id="inspectionNextBtn" onclick="nextInspectionSection()" style="margin-top:6px">ถัดไป</button>
+          <button class="btn btn-mini" onclick="backToInspectionMode()" style="margin-top:6px">กลับหน้าแรก</button>
           <button class="btn" onclick="printReport()" style="margin-top:6px">🖨️ พิมพ์/Export PDF</button>
         </div>
       </div>
@@ -810,8 +945,7 @@ async function startDashWithSchool(schoolId) {
   const r = await post('getSchoolList');
   if (r && r.success) {
     SCHOOLS = (r.data || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const sel = $('#schoolSelect');
-    sel.innerHTML = '<option value="">— เลือกสถานศึกษา —</option>' + SCHOOLS.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+    initSidebarSchoolPicker();
     if (!SCHOOLS.length) $('#pinCard').innerHTML = `<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ</div>`;
   } else {
     $('#pinCard').innerHTML = `<div class="empty">${esc((r||{}).message || 'ไม่สามารถโหลดรายชื่อโรงเรียนได้')}</div>`;
@@ -954,42 +1088,121 @@ async function showDashboard() {
 // ============================================================
 function startInspection() {
   if (typeof confirmDiscardChanges === 'function' && !confirmDiscardChanges()) return;
-  // แสดง dropdown เลือกสถานศึกษาแบบเต็มหน้าจอ
+  const preselectedMode = INSPECTION_MODE === 'full' || INSPECTION_MODE === 'general' ? INSPECTION_MODE : '';
+  INSPECTION_MODE = preselectedMode;
+  // แสดงขั้นตอนเลือกโหมดก่อนเลือกสถานศึกษา
   const root = el('tab-1');
   root.innerHTML = `
-    <div class="dash-hero">
+    <div class="dash-hero inspection-start-hero">
       <div class="dash-hero-text">
         <h1>🚀 เริ่มการนิเทศ</h1>
-        <p>เลือกสถานศึกษาที่ต้องการเข้าปฏิบัติงานภาคสนาม</p>
+        <p>ขั้นตอนที่ 1 จาก 2 · เลือกโหมดการนิเทศก่อนเลือกสถานศึกษา</p>
       </div>
     </div>
-    <div class="dash-section">
-      <div class="school-pick-grid">
-        ${SCHOOLS.map(s => `
-          <div class="school-pick-card" onclick="pickSchool('${esc(s.id)}')">
-            <div class="school-pick-icon">🏫</div>
-            <div class="school-pick-name">${esc(s.name)}</div>
-            <div class="school-pick-dist">${esc(s.dist || '-')} · ${esc(s.subdist || '-')}</div>
-            <div class="school-pick-form">${esc(s.form || '-')}</div>
-          </div>
-        `).join('')}
-        ${!SCHOOLS.length ? '<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ</div>' : ''}
+    <div class="dash-section inspection-mode-section">
+      <h3>เลือกประเภทการนิเทศ</h3>
+      <div class="dash-stats">
+        <button class="dash-stat-card inspection-mode-full" type="button" onclick="chooseInspectionMode('full')">
+          <div class="dash-stat-icon">📋</div><div class="dash-stat-label">นิเทศเต็มรูปแบบ</div><small>บันทึกข้อมูลครบทุกด้าน</small>
+        </button>
+        <button class="dash-stat-card inspection-mode-general" type="button" onclick="chooseInspectionMode('general')">
+          <div class="dash-stat-icon">🧭</div><div class="dash-stat-label">นิเทศทั่วไป</div><small>บันทึกเฉพาะแบบนิเทศทั่วไประดับพื้นที่</small>
+        </button>
       </div>
+      <div id="inspectionModeHint" class="hint">กรุณาเลือกประเภทการนิเทศก่อนเลือกสถานศึกษา</div>
     </div>
+    <div id="inspectionSchoolStep"></div>
   `;
-  // sync sidebar dropdown
+  syncSidebarSchoolPicker('');
+  if (preselectedMode) chooseInspectionMode(preselectedMode);
+}
+
+function renderInspectionSchoolStep() {
+  const root = el('inspectionSchoolStep');
+  if (!root) return;
+  root.innerHTML = `<div class="dash-section">
+    <h3>เลือกสถานศึกษา</h3>
+    <p class="hint">ขั้นตอนที่ 2 จาก 2 · แตะสถานศึกษา ระบบจะเปิดแบบบันทึกให้อัตโนมัติ</p>
+    <div class="school-pick-grid">
+      ${SCHOOLS.map(s => `
+        <div class="school-pick-card ${INSPECTION_SCHOOL_PENDING === s.id ? 'selected' : ''}" onclick="selectInspectionSchool('${esc(s.id)}')">
+          <div class="school-pick-icon">🏫</div>
+          <div class="school-pick-name">${esc(s.name)}</div>
+          <div class="school-pick-dist">${esc(s.dist || '-')} · ${esc(s.subdist || '-')}</div>
+          <div class="school-pick-form">${esc(s.form || '-')}</div>
+        </div>
+      `).join('')}
+      ${!SCHOOLS.length ? '<div class="empty">ยังไม่มีข้อมูลสถานศึกษาในระบบ</div>' : ''}
+    </div>
+    <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+      <button class="btn btn-primary" type="button" onclick="nextToInspectionRecording()" ${INSPECTION_SCHOOL_PENDING ? '' : 'disabled'}>ถัดไป</button>
+      <button class="btn" type="button" onclick="backToInspectionMode()">กลับหน้าแรก</button>
+    </div>
+  </div>`;
+}
+
+function selectInspectionSchool(id) {
+  if (!INSPECTION_MODE) { toast('กรุณาเลือกประเภทการนิเทศก่อน', false); return; }
+  INSPECTION_SCHOOL_PENDING = id;
   const sel = $('#schoolSelect');
-  if (sel) sel.value = '';
+  if (sel) sel.value = id;
+  nextToInspectionRecording();
+}
+
+function nextToInspectionRecording() {
+  if (!INSPECTION_SCHOOL_PENDING) { toast('กรุณาเลือกสถานศึกษาก่อน', false); return; }
+  loadSchool(INSPECTION_SCHOOL_PENDING);
+}
+
+function backToInspectionMode() {
+  INSPECTION_SCHOOL_PENDING = '';
+  INSPECTION_MODE = '';
+  startInspection();
 }
 
 function startInspectionSchool(id) {
-  const sel = $('#schoolSelect');
-  if (sel) sel.value = id;
-  loadSchool(id);
+  if (!INSPECTION_MODE) { startInspection(); toast('กรุณาเลือกประเภทการนิเทศก่อน', false); return; }
+  selectInspectionSchool(id);
 }
 
 function pickSchool(id) {
   startInspectionSchool(id);
+}
+
+function chooseInspectionMode(mode) {
+  INSPECTION_MODE = mode === 'general' ? 'general' : 'full';
+  INSPECTION_SCHOOL_PENDING = '';
+  const fullCard = document.querySelector('.inspection-mode-full');
+  const generalCard = document.querySelector('.inspection-mode-general');
+  if (fullCard) fullCard.classList.toggle('selected', INSPECTION_MODE === 'full');
+  if (generalCard) generalCard.classList.toggle('selected', INSPECTION_MODE === 'general');
+  const hint = $('#inspectionModeHint');
+  if (hint) hint.textContent = INSPECTION_MODE === 'general'
+    ? 'เลือกสถานศึกษาเพื่อเปิดแบบนิเทศทั่วไปเท่านั้น'
+    : 'เลือกสถานศึกษาเพื่อเปิดแบบนิเทศเต็มรูปแบบทุกด้าน';
+  renderInspectionSchoolStep();
+}
+
+function applyInspectionModeUI() {
+  const generalOnly = INSPECTION_MODE === 'general';
+  const fullTabs = ['tab-1','tab-2','tab-3','tab-4','tab-5','tab-6','tab-7','tab-files','tab-hist','tab-stats','tab-users'];
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    if (fullTabs.includes(btn.dataset.target)) btn.style.display = generalOnly ? 'none' : '';
+  });
+  const saveFull = $('#saveFullBtn');
+  if (saveFull) saveFull.style.display = generalOnly ? 'none' : '';
+  const nextBtn = $('#inspectionNextBtn');
+  if (nextBtn) nextBtn.style.display = generalOnly ? 'none' : '';
+}
+
+function nextInspectionSection() {
+  if (INSPECTION_MODE === 'general') {
+    showAreaEvaluation();
+    return;
+  }
+  const tabs = ['tab-1','tab-2','tab-3','tab-4','tab-5','tab-6','tab-7'];
+  const active = tabs.findIndex(id => el(id) && el(id).classList.contains('active'));
+  switchTab(tabs[Math.min(active < 0 ? 0 : active + 1, tabs.length - 1)]);
 }
 
 function resumeDraft(schoolName) {
@@ -1001,81 +1214,137 @@ function resumeDraft(schoolName) {
 
 async function loadSchool(id, options = {}) {
   if (!options.skipConfirm && typeof confirmDiscardChanges === 'function' && SELECTED && id !== SELECTED.id && !confirmDiscardChanges()) {
-    const sel = $('#schoolSelect');
-    if (sel) sel.value = SELECTED.id;
-    return;
+    syncSidebarSchoolPicker(SELECTED.id);
+    return false;
   }
-  if (!id) { SELECTED = null; if (typeof setFormClean === 'function') setFormClean(); return; }
+  if (!id) { SELECTED = null; syncSidebarSchoolPicker(''); if (typeof setFormClean === 'function') setFormClean(); return false; }
   const r = await post('getSchoolData', id);
-  if (!r || !r.success) { toast((r||{}).message || 'โหลดข้อมูลไม่สำเร็จ', false); return; }
+  if (!r || !r.success) { syncSidebarSchoolPicker(SELECTED ? SELECTED.id : ''); toast((r||{}).message || 'โหลดข้อมูลไม่สำเร็จ', false); return false; }
   SELECTED = r.data;
   SELECTED_COORDS = SELECTED.coords || '';
   SCHOOLS = SCHOOLS.map(s => s.id === SELECTED.id ? { ...s, ...r.data } : s);
+  syncSidebarSchoolPicker(SELECTED.id);
   STATE = { answers: {}, notes: {}, multibasic: {}, multiVals: {}, basic: {}, evalMeta: { formType: ROUNDS[0].v, round: "" } };
   EDIT_ROW = null;
   buildAll();
   if (typeof setFormClean === 'function') setFormClean();
   switchTab('tab-1');
+  applyInspectionModeUI();
   startAutoSave();
-  if (!options.skipDraft) restoreDraftIfAny();
+  if (!options.skipDraft && INSPECTION_MODE !== 'general') restoreDraftIfAny();
+  if (INSPECTION_MODE === 'general') showAreaEvaluation();
   toast('เลือก ' + SELECTED.name + ' แล้ว', true);
+  return true;
 }
 
 // -------- แผนที่ (Leaflet + GPS) --------
-function initPinBar() {
-  const card = $('#pinCard');
-  if (!card) return;
-  card.innerHTML = `<div class="pin-head"><b>📍 ที่ตั้งสถานศึกษา</b>
-    <button type="button" class="btn btn-mini" id="gpsBtn">📌 หาพิกัดปัจจุบัน</button></div>
-    <div id="map" class="map"></div>
-    <div class="pin-coords"><input id="coords" placeholder="ละติจูด, ลองจิจูด" value="${esc(SELECTED_COORDS || '')}">
-    <button type="button" class="btn btn-mini" id="setPin">บันทึกพิกัด</button></div>`;
-  if (typeof L === 'undefined') {
-    card.innerHTML = '<div class="empty">แผนที่โหลดไม่พร้อม (Leaflet)</div>';
-    return;
-  }
-  if (!MAP) {
-    MAP = L.map('map').setView([6.4246, 101.8249], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '&copy; OpenStreetMap'
-    }).addTo(MAP);
-    // ชั้นดาวเทียมเพิ่มเติม
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19, className: 'satellite-layer'
-    }).addTo(MAP);
-  }
-  setTimeout(() => MAP.invalidateSize(), 300);
-  const c = SELECTED_COORDS || SELECTED.coords || '';
-  if (c) {
-    const [lat, lng] = c.split(',').map(parseFloat);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      if (MAP_MARKER) MAP_MARKER.setLatLng([lat, lng]); else MAP_MARKER = L.marker([lat, lng]).addTo(MAP);
-      MAP.setView([lat, lng], 15);
+function destroyPinMaps() {
+  PIN_MAPS.forEach(pin => pin.destroy());
+  PIN_MAPS.clear();
+}
+
+function refreshPinMaps() {
+  PIN_MAPS.forEach(pin => pin.refresh());
+}
+
+function initPinBar(targetId) {
+  const card = (targetId && $('#' + targetId)) || $('#basicPinCard') || $('#pinCard');
+  if (!card || !SELECTED) return;
+  // Each form owns its map. Remove old instances before replacing their elements.
+  PIN_MAPS.forEach((pin, host) => {
+    if (host === card || !host.isConnected) {
+      pin.destroy();
+      PIN_MAPS.delete(host);
     }
+  });
+  const school = SELECTED;
+  card.innerHTML = `<div class="pin-head"><b>📍 ที่ตั้งสถานศึกษา</b>
+    <div class="pin-tools"><button type="button" class="btn btn-mini pin-gps">📌 หาพิกัดปัจจุบัน</button></div></div>
+    <div id="${card.id}-map" class="map" aria-label="แผนที่ตั้งสถานศึกษา"></div>
+    <div class="pin-coords"><input class="pin-coords-input" aria-label="ละติจูด, ลองจิจูด" placeholder="ละติจูด, ลองจิจูด" value="${esc(SELECTED_COORDS || school.coords || '')}">
+    <button type="button" class="btn btn-mini pin-save">บันทึกพิกัด</button></div>`;
+  const mapElement = card.querySelector('.map');
+  const coordsInput = card.querySelector('.pin-coords-input');
+  let map = null, marker = null, observer = null;
+  const pin = {
+    schoolId: school.id,
+    setCoords(value) {
+      coordsInput.value = value;
+      const [lat, lng] = value.split(',').map(parseFloat);
+      if (map && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        placeMarker(lat, lng);
+        map.setView([lat, lng], 15);
+      }
+    },
+    refresh() {
+      if (map && mapElement.isConnected && mapElement.clientWidth && mapElement.clientHeight) {
+        map.invalidateSize({ pan: false });
+      }
+    },
+    destroy() {
+      if (observer) observer.disconnect();
+      if (map) map.remove();
+      map = null;
+    }
+  };
+  PIN_MAPS.set(card, pin);
+  const isCurrent = () => card.isConnected && PIN_MAPS.get(card) === pin && SELECTED && SELECTED.id === school.id;
+  const placeMarker = (lat, lng) => {
+    if (!map) return;
+    if (marker) marker.setLatLng([lat, lng]); else marker = L.marker([lat, lng]).addTo(map);
+  };
+  if (typeof L !== 'undefined') {
+    map = L.map(mapElement).setView([6.4246, 101.8249], 10);
+    const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap'
+    });
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: 'Tiles &copy; Esri', className: 'satellite-layer'
+    });
+    satelliteLayer.addTo(map);
+    L.control.layers({ '🛰️ แผนที่ดาวเทียม': satelliteLayer, '🗺️ แผนที่เส้นทาง': roadLayer }, null, { collapsed: false }).addTo(map);
+    pin.setCoords(coordsInput.value);
+    map.on('click', e => {
+      if (!isCurrent()) return;
+      coordsInput.value = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
+      placeMarker(e.latlng.lat, e.latlng.lng);
+    });
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => pin.refresh());
+      observer.observe(mapElement);
+    }
+    requestAnimationFrame(() => pin.refresh());
+  } else {
+    mapElement.innerHTML = '<div class="empty">โหลดแผนที่ไม่สำเร็จ กรุณารีเฟรชหน้าเว็บ หรือระบุพิกัดในช่องด้านล่าง</div>';
   }
-  $('#gpsBtn').onclick = async () => {
+  card.querySelector('.pin-gps').onclick = () => {
+    if (!isCurrent()) return;
     if (!navigator.geolocation) { toast('อุปกรณ์ไม่รองรับ GPS', false); return; }
     toast('กำลังค้นหาพิกัด... (อาจใช้เวลา 15-30 วินาที)', false);
     navigator.geolocation.getCurrentPosition(p => {
+      if (!isCurrent()) return;
       const lat = p.coords.latitude.toFixed(6), lng = p.coords.longitude.toFixed(6);
-      $('#coords').value = lat + ', ' + lng;
-      if (MAP_MARKER) MAP_MARKER.setLatLng([lat, lng]); else MAP_MARKER = L.marker([lat, lng]).addTo(MAP);
-      MAP.setView([lat, lng], 15);
+      coordsInput.value = lat + ', ' + lng;
+      placeMarker(lat, lng);
+      if (map) map.setView([lat, lng], 15);
       toast('ได้พิกัดจาก GPS แล้ว (' + lat + ', ' + lng + ')', true);
     }, (err) => {
+      if (!isCurrent()) return;
       toast('GPS ไม่สำเร็จ: ' + (err.code === 2 ? 'ไม่พบสัญญาณ GPS' : err.code === 3 ? 'หมดเวลาค้นหา' : 'กรุณาพิมพ์พิกัดเอง') + ' — ลองคลิกบนแผนที่', false);
     }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 });
   };
-  MAP.on('click', e => {
-    const lat = e.latlng.lat.toFixed(6), lng = e.latlng.lng.toFixed(6);
-    $('#coords').value = lat + ', ' + lng;
-    if (MAP_MARKER) MAP_MARKER.setLatLng(e.latlng); else MAP_MARKER = L.marker(e.latlng).addTo(MAP);
-  });
-  $('#setPin').onclick = async () => {
-    const v = $('#coords').value.trim();
+  card.querySelector('.pin-save').onclick = async () => {
+    if (!isCurrent()) return;
+    const v = coordsInput.value.trim();
     if (!v) { toast('กรุณาระบุพิกัด', false); return; }
-    const r = await post('saveSchoolPin', { id: SELECTED.id, coords: v });
-    if (r && r.success) { SELECTED_COORDS = v; SELECTED.coords = v; toast(r.message, true); }
+    const r = await post('saveSchoolPin', { id: school.id, coords: v });
+    if (!isCurrent()) return;
+    if (r && r.success) {
+      SELECTED_COORDS = v;
+      SELECTED.coords = v;
+      PIN_MAPS.forEach(other => { if (other.schoolId === school.id) other.setCoords(v); });
+      toast(r.message, true);
+    }
     else toast((r||{}).message || 'บันทึกไม่สำเร็จ', false);
   };
 }
