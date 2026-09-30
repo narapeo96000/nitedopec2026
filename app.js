@@ -221,8 +221,7 @@ let SELECTED = null;        // ข้อมูลโรงเรียนที�
 let INSPECTION_MODE = '';
 let INSPECTION_SCHOOL_PENDING = '';
 let SELECTED_COORDS = '';
-let MAP = null;
-let MAP_MARKER = null;
+const PIN_MAPS = new Map();
 let TABS = [];              // พาเนลแท็บที่ build ไว้
 let scrollItems = [];
 let sidebarTouched = false;
@@ -309,6 +308,7 @@ function checkCaptcha() {
 }
 
 function showLogin() {
+  destroyPinMaps();
   LOGIN_SCHOOL_ID = '';
   LOGIN_INSPECTION_MODE = '';
   LOGIN_BUSY = false;
@@ -692,6 +692,7 @@ function logout() {
 // หน้าหลัก / Dashboard
 // ============================================================
 async function startDash() {
+  destroyPinMaps();
   const app = $('#app');
   app.innerHTML = `
     <div class="topbar">
@@ -775,6 +776,7 @@ async function startDash() {
 // เข้าสู่ระบบแล้วเปิดโรงเรียนที่เลือกจากหน้า Login ทันที
 // ============================================================
 async function startDashWithSchool(schoolId) {
+  destroyPinMaps();
   const app = $('#app');
   app.innerHTML = `
     <div class="topbar">
@@ -1137,66 +1139,113 @@ async function loadSchool(id, options = {}) {
 }
 
 // -------- แผนที่ (Leaflet + GPS) --------
+function destroyPinMaps() {
+  PIN_MAPS.forEach(pin => pin.destroy());
+  PIN_MAPS.clear();
+}
+
+function refreshPinMaps() {
+  PIN_MAPS.forEach(pin => pin.refresh());
+}
+
 function initPinBar(targetId) {
   const card = (targetId && $('#' + targetId)) || $('#basicPinCard') || $('#pinCard');
-  if (!card) return;
+  if (!card || !SELECTED) return;
+  // Each form owns its map. Remove old instances before replacing their elements.
+  PIN_MAPS.forEach((pin, host) => {
+    if (host === card || !host.isConnected) {
+      pin.destroy();
+      PIN_MAPS.delete(host);
+    }
+  });
+  const school = SELECTED;
   card.innerHTML = `<div class="pin-head"><b>📍 ที่ตั้งสถานศึกษา</b>
-    <div class="pin-tools"><button type="button" class="btn btn-mini" id="gpsBtn">📌 หาพิกัดปัจจุบัน</button></div></div>
-    <div id="map" class="map"></div>
-    <div class="pin-coords"><input id="coords" placeholder="ละติจูด, ลองจิจูด" value="${esc(SELECTED_COORDS || '')}">
-    <button type="button" class="btn btn-mini" id="setPin">บันทึกพิกัด</button></div>`;
-  if (typeof L === 'undefined') {
-    card.innerHTML = '<div class="empty">แผนที่โหลดไม่พร้อม (Leaflet)</div>';
-    return;
-  }
-  if (MAP) {
-    MAP.remove();
-    MAP = null;
-    MAP_MARKER = null;
-  }
-  if (!MAP) {
-    MAP = L.map('map').setView([6.4246, 101.8249], 10);
+    <div class="pin-tools"><button type="button" class="btn btn-mini pin-gps">📌 หาพิกัดปัจจุบัน</button></div></div>
+    <div id="${card.id}-map" class="map" aria-label="แผนที่ตั้งสถานศึกษา"></div>
+    <div class="pin-coords"><input class="pin-coords-input" aria-label="ละติจูด, ลองจิจูด" placeholder="ละติจูด, ลองจิจูด" value="${esc(SELECTED_COORDS || school.coords || '')}">
+    <button type="button" class="btn btn-mini pin-save">บันทึกพิกัด</button></div>`;
+  const mapElement = card.querySelector('.map');
+  const coordsInput = card.querySelector('.pin-coords-input');
+  let map = null, marker = null, observer = null;
+  const pin = {
+    schoolId: school.id,
+    setCoords(value) {
+      coordsInput.value = value;
+      const [lat, lng] = value.split(',').map(parseFloat);
+      if (map && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        placeMarker(lat, lng);
+        map.setView([lat, lng], 15);
+      }
+    },
+    refresh() {
+      if (map && mapElement.isConnected && mapElement.clientWidth && mapElement.clientHeight) {
+        map.invalidateSize({ pan: false });
+      }
+    },
+    destroy() {
+      if (observer) observer.disconnect();
+      if (map) map.remove();
+      map = null;
+    }
+  };
+  PIN_MAPS.set(card, pin);
+  const isCurrent = () => card.isConnected && PIN_MAPS.get(card) === pin && SELECTED && SELECTED.id === school.id;
+  const placeMarker = (lat, lng) => {
+    if (!map) return;
+    if (marker) marker.setLatLng([lat, lng]); else marker = L.marker([lat, lng]).addTo(map);
+  };
+  if (typeof L !== 'undefined') {
+    map = L.map(mapElement).setView([6.4246, 101.8249], 10);
     const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, attribution: '&copy; OpenStreetMap'
     });
     const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19, attribution: 'Tiles &copy; Esri', className: 'satellite-layer'
     });
-    satelliteLayer.addTo(MAP);
-    L.control.layers({ '🛰️ แผนที่ดาวเทียม': satelliteLayer, '🗺️ แผนที่เส้นทาง': roadLayer }, null, { collapsed: false }).addTo(MAP);
-  }
-  setTimeout(() => MAP.invalidateSize(), 300);
-  const c = SELECTED_COORDS || SELECTED.coords || '';
-  if (c) {
-    const [lat, lng] = c.split(',').map(parseFloat);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      if (MAP_MARKER) MAP_MARKER.setLatLng([lat, lng]); else MAP_MARKER = L.marker([lat, lng]).addTo(MAP);
-      MAP.setView([lat, lng], 15);
+    satelliteLayer.addTo(map);
+    L.control.layers({ '🛰️ แผนที่ดาวเทียม': satelliteLayer, '🗺️ แผนที่เส้นทาง': roadLayer }, null, { collapsed: false }).addTo(map);
+    pin.setCoords(coordsInput.value);
+    map.on('click', e => {
+      if (!isCurrent()) return;
+      coordsInput.value = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
+      placeMarker(e.latlng.lat, e.latlng.lng);
+    });
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => pin.refresh());
+      observer.observe(mapElement);
     }
+    requestAnimationFrame(() => pin.refresh());
+  } else {
+    mapElement.innerHTML = '<div class="empty">โหลดแผนที่ไม่สำเร็จ กรุณารีเฟรชหน้าเว็บ หรือระบุพิกัดในช่องด้านล่าง</div>';
   }
-  $('#gpsBtn').onclick = async () => {
+  card.querySelector('.pin-gps').onclick = () => {
+    if (!isCurrent()) return;
     if (!navigator.geolocation) { toast('อุปกรณ์ไม่รองรับ GPS', false); return; }
     toast('กำลังค้นหาพิกัด... (อาจใช้เวลา 15-30 วินาที)', false);
     navigator.geolocation.getCurrentPosition(p => {
+      if (!isCurrent()) return;
       const lat = p.coords.latitude.toFixed(6), lng = p.coords.longitude.toFixed(6);
-      $('#coords').value = lat + ', ' + lng;
-      if (MAP_MARKER) MAP_MARKER.setLatLng([lat, lng]); else MAP_MARKER = L.marker([lat, lng]).addTo(MAP);
-      MAP.setView([lat, lng], 15);
+      coordsInput.value = lat + ', ' + lng;
+      placeMarker(lat, lng);
+      if (map) map.setView([lat, lng], 15);
       toast('ได้พิกัดจาก GPS แล้ว (' + lat + ', ' + lng + ')', true);
     }, (err) => {
+      if (!isCurrent()) return;
       toast('GPS ไม่สำเร็จ: ' + (err.code === 2 ? 'ไม่พบสัญญาณ GPS' : err.code === 3 ? 'หมดเวลาค้นหา' : 'กรุณาพิมพ์พิกัดเอง') + ' — ลองคลิกบนแผนที่', false);
     }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 });
   };
-  MAP.on('click', e => {
-    const lat = e.latlng.lat.toFixed(6), lng = e.latlng.lng.toFixed(6);
-    $('#coords').value = lat + ', ' + lng;
-    if (MAP_MARKER) MAP_MARKER.setLatLng(e.latlng); else MAP_MARKER = L.marker(e.latlng).addTo(MAP);
-  });
-  $('#setPin').onclick = async () => {
-    const v = $('#coords').value.trim();
+  card.querySelector('.pin-save').onclick = async () => {
+    if (!isCurrent()) return;
+    const v = coordsInput.value.trim();
     if (!v) { toast('กรุณาระบุพิกัด', false); return; }
-    const r = await post('saveSchoolPin', { id: SELECTED.id, coords: v });
-    if (r && r.success) { SELECTED_COORDS = v; SELECTED.coords = v; toast(r.message, true); }
+    const r = await post('saveSchoolPin', { id: school.id, coords: v });
+    if (!isCurrent()) return;
+    if (r && r.success) {
+      SELECTED_COORDS = v;
+      SELECTED.coords = v;
+      PIN_MAPS.forEach(other => { if (other.schoolId === school.id) other.setCoords(v); });
+      toast(r.message, true);
+    }
     else toast((r||{}).message || 'บันทึกไม่สำเร็จ', false);
   };
 }

@@ -398,6 +398,7 @@ function switchTab(id) {
     $(`#${t}`).classList.toggle('active', t === id));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.target === id));
   applyAnswersToDom($(`#${id}`));
+  requestAnimationFrame(refreshPinMaps);
   sidebarTouched = true;
 }
 
@@ -497,6 +498,7 @@ async function saveAreaEvaluation() {
 }
 
 function buildAll() {
+  destroyPinMaps();
   buildTab1(); buildTab2(); buildTab3(); buildTab4(); buildTab5(); buildTab6(); buildTab7();
   if (SELECTED) { initPinBar(); }
   updateScoreBar();
